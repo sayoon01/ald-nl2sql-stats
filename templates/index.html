@@ -1,0 +1,349 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALD NL→SQL</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+      margin: 0; 
+      padding: 24px;
+      background: #1a1a2e;
+      min-height: 100vh;
+      color: #e0e0e0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      padding: 32px;
+      border: 1px solid #2a2a3e;
+    }
+    h2 {
+      margin: 0 0 24px 0;
+      color: #fff;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .form-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    input[type=text] { 
+      flex: 1;
+      padding: 14px 16px; 
+      font-size: 16px;
+      border: 2px solid #2a2a3e;
+      border-radius: 8px;
+      background: #0f1624;
+      color: #e0e0e0;
+      transition: border-color 0.3s;
+    }
+    input[type=text]:focus {
+      outline: none;
+      border-color: #4a5d7e;
+    }
+    input[type=text]::placeholder {
+      color: #6a6a7e;
+    }
+    button { 
+      padding: 14px 28px; 
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2d3748;
+      color: white;
+      border: 1px solid #4a5568;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    button:hover {
+      background: #4a5568;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(74, 85, 104, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .box { 
+      margin-top: 24px; 
+      padding: 20px; 
+      border: 1px solid #2a2a3e; 
+      border-radius: 12px;
+      background: #0f1624;
+    }
+    .box h3 {
+      margin: 0 0 12px 0;
+      color: #fff;
+      font-size: 18px;
+    }
+    .examples {
+      margin: 16px 0;
+    }
+    .examples ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .examples li {
+      display: inline-block;
+    }
+    code { 
+      background: #1a1a2e; 
+      padding: 6px 12px; 
+      border-radius: 6px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      color: #7c9ed9;
+      border: 1px solid #2a2a3e;
+    }
+    .error-box {
+      background: #2d1b1b;
+      border-color: #4a2a2a;
+      color: #ff6b6b;
+    }
+    table { 
+      border-collapse: collapse; 
+      margin-top: 16px; 
+      width: 100%;
+      background: #16213e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th, td { 
+      border: 1px solid #2a2a3e; 
+      padding: 12px 16px; 
+      font-size: 14px; 
+      text-align: left;
+    }
+    th { 
+      background: #2d3748;
+      color: #fff;
+      font-weight: 600;
+    }
+    td {
+      color: #e0e0e0;
+    }
+    tr:nth-child(even) {
+      background: #1a2332;
+    }
+    tr:hover {
+      background: #253447;
+    }
+    .summary {
+      font-size: 16px;
+      color: #e0e0e0;
+      margin-bottom: 12px;
+      padding: 12px;
+      background: #1a2332;
+      border-left: 4px solid #4a5d7e;
+      border-radius: 4px;
+    }
+    .meta {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #a0a0b0;
+    }
+    .meta code {
+      background: #1a1a2e;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .plot-container {
+      margin-top: 16px;
+      padding: 20px;
+      background: #0f1624;
+      border-radius: 8px;
+      border: 1px solid #2a2a3e;
+    }
+    .plot-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+      margin: 16px auto 0 auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .plot-links {
+      margin-top: 16px;
+      padding: 16px;
+      background: #0f1624;
+      border-radius: 8px;
+      border: 1px solid #2a2a3e;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .plot-links a {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #2d3748;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+      border: 1px solid #4a5568;
+      transition: all 0.2s;
+    }
+    .plot-links a:hover {
+      background: #4a5568;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(74, 85, 104, 0.4);
+    }
+    .no-results {
+      margin-top: 16px;
+      padding: 16px;
+      background: #2d2d1b;
+      border-radius: 8px;
+      color: #ffd93d;
+      border-left: 4px solid #ffd93d;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>ALD 자연어 → SQL 기본통계</h2>
+
+    <form method="get" action="/view">
+      <div class="form-group">
+        <input type="text" name="q" value="{{ q|default('') }}" placeholder="예: 공정별 pressact 평균 top5" />
+        <button type="submit">실행</button>
+      </div>
+    </form>
+
+    <div class="box">
+      <h3>예시 질문</h3>
+      <div class="examples">
+        <ul>
+          <li><code>공정별 pressact 평균 top5</code></li>
+          <li><code>standard_trace_001 스텝별 pressact 평균</code></li>
+          <li><code>standard_trace_001 step=STANDBY pressact 최대</code></li>
+        </ul>
+      </div>
+    </div>
+
+    {% if error %}
+      <div class="box error-box">
+        <h3>에러</h3>
+        <div>{{ error }}</div>
+      </div>
+    {% endif %}
+
+    {% if parsed %}
+      <div class="box">
+        <div class="summary">
+          <div style="font-size: 18px; margin-bottom: 8px;">
+            <strong>📊 결과 요약</strong>
+          </div>
+          <div style="font-size: 16px; line-height: 1.6;">
+            {{ summary }}
+          </div>
+          {% if parsed.group_by %}
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2a3e; font-size: 14px; color: #b0b0c0;">
+              💡 <strong>팁:</strong> 아래 차트에서 각 {{ "단계" if parsed.group_by == "step_name" else "공정" }}별 값을 시각적으로 비교할 수 있습니다.
+            </div>
+          {% endif %}
+        </div>
+        
+        <details style="margin-top: 16px;">
+          <summary style="cursor: pointer; color: #7c9ed9; font-weight: 500; padding: 8px; background: #1a2332; border-radius: 6px;">
+            🔍 상세 정보 보기/숨기기
+          </summary>
+          <div class="meta" style="margin-top: 12px;">
+            <div style="margin-bottom: 8px;">
+              <strong>분석 파라미터:</strong> <code>{{ parsed }}</code>
+            </div>
+            <div>
+              <strong>실행된 SQL:</strong> <code>{{ sql }}</code>
+            </div>
+          </div>
+        </details>
+
+        {% if rows and rows|length > 0 and parsed.group_by %}
+          <div class="plot-container">
+            <div style="margin-bottom: 16px; padding: 12px; background: #1a2332; border-radius: 8px; border-left: 4px solid #4a5d7e;">
+              <div style="font-weight: 600; color: #fff; margin-bottom: 8px;">📊 차트 해석 가이드</div>
+              <div style="font-size: 14px; color: #b0b0c0; line-height: 1.6;">
+                {% if parsed.group_by == 'step_name' %}
+                  • <strong style="color: #7c9ed9;">각 단계별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
+                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.<br/>
+                  • 단계별로 어떤 단계에서 값이 가장 높거나 낮은지 비교할 수 있습니다.
+                {% elif parsed.group_by == 'trace_id' %}
+                  • <strong style="color: #7c9ed9;">각 공정별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
+                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.<br/>
+                  • 공정 간 데이터를 비교하여 어떤 공정에서 값이 가장 높거나 낮은지 확인할 수 있습니다.
+                {% else %}
+                  • <strong style="color: #7c9ed9;">그룹별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
+                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.
+                {% endif %}
+              </div>
+            </div>
+            <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <div style="display:none; color: #ff6b6b; padding: 20px; text-align: center;">
+              차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #7c9ed9;">여기를 클릭</a>하여 직접 확인하세요.
+            </div>
+          </div>
+        {% endif %}
+
+        {% if rows and rows|length > 0 %}
+          <div style="margin-top: 20px; padding-bottom: 8px;">
+            <strong style="font-size: 16px;">📋 데이터 테이블</strong>
+            <span style="font-size: 13px; color: #b0b0c0; margin-left: 8px;">
+              (총 {{ rows|length }}개 결과)
+            </span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  {% for k in rows[0].keys() %}
+                    <th>
+                      {{ k }}
+                      {% if k == "trace_id" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(공정 ID)</span>
+                      {% elif k == "step_name" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(단계명)</span>
+                      {% elif k == "value" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(계산된 값)</span>
+                      {% elif k == "n" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(개수)</span>
+                      {% endif %}
+                    </th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in rows %}
+                  <tr>
+                    {% for k, v in r.items() %}
+                      <td>
+                        {% if k == "value" or k == "n" %}
+                          <strong style="color: #7c9ed9;">{{ v }}</strong>
+                        {% else %}
+                          {{ v }}
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="no-results">
+            결과가 없습니다. 질문을 다시 확인하거나 다른 조건으로 검색해보세요.
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>
