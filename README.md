@@ -1,5 +1,24 @@
 # ALD NL→SQL Stats API
 
+## 기술 스택
+
+- **Backend**: FastAPI
+- **DB**: DuckDB (OLAP, in-process)
+- **NLP**: Rule-based 의도 파싱
+- **Visualization**: Matplotlib
+- **Template**: Jinja2
+
+## 프로젝트 구조
+
+```
+src/
+ ├─ nl_parse.py        # 질문 → 분석 의도
+ ├─ sql_builder.py     # 의도 → SQL
+ ├─ chart_templates.py # 의도 → 차트 템플릿
+ ├─ process_metrics.py # 공정 특화 지표
+ └─ app.py             # API & UI
+```
+
 반도체 ALD 공정 데이터를 자연어로 질의하여 SQL을 생성하고 통계 분석을 제공하는 웹 애플리케이션입니다.
 
 ## 주요 기능
@@ -131,29 +150,6 @@ http://127.0.0.1:8000/view?q=pressact+평균
 http://127.0.0.1:8000/plot?q=공정별+pressact+평균
 ```
 
-## 프로젝트 구조
-
-```
-ald_app/
-├── src/
-│   ├── __init__.py          # 패키지 초기화
-│   ├── app.py               # FastAPI 애플리케이션 (웹 서버)
-│   ├── nl_parse.py          # 자연어 파싱 (질문 → Parsed 객체)
-│   ├── sql_builder.py       # SQL 생성 (Parsed → SQL)
-│   ├── run_query.py         # CLI 실행 스크립트
-│   └── preprocess_duckdb.py # CSV → DuckDB 변환
-├── templates/
-│   ├── index.html           # 메인 UI 템플릿
-│   └── plot.html            # 차트 페이지 템플릿
-├── data/                    # 히스토리/즐겨찾기 저장 (자동 생성)
-│   ├── history.json
-│   └── favorites.json
-├── data_out/
-│   └── ald.duckdb           # 변환된 데이터베이스
-├── requirements.txt         # Python 패키지 의존성
-└── README.md               # 이 파일
-```
-
 ## API 엔드포인트
 
 ### 웹 UI
@@ -236,15 +232,6 @@ step=STANDBY와 step=B.FILL5 pressact 평균 비교
 - `vg11`, `vg12`, `vg13`: 밸브 관련 지표
 - `apcvalvemon`: APC 밸브 모니터
 - `apcvalveset`: APC 밸브 설정
-
-## 기술 스택
-
-- **Python 3.13+**
-- **FastAPI**: 웹 프레임워크
-- **DuckDB**: 분석 데이터베이스
-- **Matplotlib**: 차트 생성
-- **Jinja2**: 템플릿 엔진
-- **Pandas**: 데이터 처리
 
 ## 주의사항
 

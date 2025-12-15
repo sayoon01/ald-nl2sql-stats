@@ -207,6 +207,54 @@
       border-left: 4px solid #ffd93d;
     }
   </style>
+  <script>
+    // 필터 및 정렬 기능
+    document.addEventListener('DOMContentLoaded', function() {
+      const filterInput = document.getElementById('stepFilter');
+      const sortSelect = document.getElementById('sortBy');
+      const tableBody = document.getElementById('tableBody');
+      
+      if (!filterInput || !sortSelect || !tableBody) return;
+      
+      function filterAndSort() {
+        const filterText = filterInput.value.toLowerCase();
+        const rows = Array.from(tableBody.querySelectorAll('tr'));
+        
+        // 필터링
+        rows.forEach(row => {
+          const stepName = row.dataset.stepName || '';
+          if (stepName.includes(filterText)) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+        
+        // 정렬
+        const visibleRows = rows.filter(r => r.style.display !== 'none');
+        const sortValue = sortSelect.value;
+        
+        visibleRows.sort((a, b) => {
+          if (sortValue === 'value_desc') {
+            return parseFloat(b.dataset.value || 0) - parseFloat(a.dataset.value || 0);
+          } else if (sortValue === 'value_asc') {
+            return parseFloat(a.dataset.value || 0) - parseFloat(b.dataset.value || 0);
+          } else if (sortValue === 'name_asc') {
+            return (a.dataset.stepName || '').localeCompare(b.dataset.stepName || '');
+          } else if (sortValue === 'name_desc') {
+            return (b.dataset.stepName || '').localeCompare(a.dataset.stepName || '');
+          }
+          return 0;
+        });
+        
+        // 재배치
+        visibleRows.forEach(row => tableBody.appendChild(row));
+      }
+      
+      filterInput.addEventListener('input', filterAndSort);
+      sortSelect.addEventListener('change', filterAndSort);
+    });
+  </script>
 </head>
 <body>
   <div class="container">
@@ -224,8 +272,10 @@
       <div class="examples">
         <ul>
           <li><code>공정별 pressact 평균 top5</code></li>
-          <li><code>standard_trace_001 스텝별 pressact 평균</code></li>
-          <li><code>standard_trace_001 step=STANDBY pressact 최대</code></li>
+          <li><code>스텝별 pressact 평균</code> <small style="color: #b0b0c0;">(n/std/min/max 포함)</small></li>
+          <li><code>pressact overshoot top10</code> <small style="color: #b0b0c0;">(오버슈트 큰 step)</small></li>
+          <li><code>pressact 이상치 top5</code> <small style="color: #b0b0c0;">(이상치 비율 큰 trace)</small></li>
+          <li><code>standard_trace_001과 standard_trace_002 pressact 비교</code> <small style="color: #b0b0c0;">(차이 큰 step top5)</small></li>
         </ul>
       </div>
     </div>
@@ -254,20 +304,22 @@
         </div>
         
         <details style="margin-top: 16px;">
-          <summary style="cursor: pointer; color: #7c9ed9; font-weight: 500; padding: 8px; background: #1a2332; border-radius: 6px;">
+          <summary style="cursor: pointer; color: #7c9ed9; font-weight: 500; padding: 8px; background: #1a2332; border-radius: 6px; user-select: none;">
             🔍 상세 정보 보기/숨기기
           </summary>
-          <div class="meta" style="margin-top: 12px;">
-            <div style="margin-bottom: 8px;">
-              <strong>분석 파라미터:</strong> <code>{{ parsed }}</code>
+          <div class="meta" style="margin-top: 12px; padding: 12px; background: #1a1a2e; border-radius: 8px;">
+            <div style="margin-bottom: 12px;">
+              <strong style="color: #fff;">분석 파라미터:</strong>
+              <pre style="margin: 8px 0 0 0; padding: 8px; background: #0f1624; border-radius: 4px; overflow-x: auto; color: #7c9ed9; font-size: 12px;">{{ parsed }}</pre>
             </div>
             <div>
-              <strong>실행된 SQL:</strong> <code>{{ sql }}</code>
+              <strong style="color: #fff;">실행된 SQL:</strong>
+              <pre style="margin: 8px 0 0 0; padding: 8px; background: #0f1624; border-radius: 4px; overflow-x: auto; color: #7c9ed9; font-size: 12px; white-space: pre-wrap;">{{ sql }}</pre>
             </div>
           </div>
         </details>
 
-        {% if rows and rows|length > 0 and parsed.group_by %}
+        {% if rows and rows|length > 0 and (parsed.group_by or parsed.is_outlier or parsed.is_overshoot or parsed.is_trace_compare) %}
           <div class="plot-container">
             <div style="margin-bottom: 16px; padding: 12px; background: #1a2332; border-radius: 8px; border-left: 4px solid #4a5d7e;">
               <div style="font-weight: 600; color: #fff; margin-bottom: 8px;">📊 차트 해석 가이드</div>
@@ -294,12 +346,42 @@
         {% endif %}
 
         {% if rows and rows|length > 0 %}
-          <div style="margin-top: 20px; padding-bottom: 8px;">
-            <strong style="font-size: 16px;">📋 데이터 테이블</strong>
-            <span style="font-size: 13px; color: #b0b0c0; margin-left: 8px;">
-              (총 {{ rows|length }}개 결과)
-            </span>
-          </div>
+          <div style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <strong style="font-size: 16px;">📋 데이터 테이블</strong>
+                <span style="font-size: 13px; color: #b0b0c0; margin-left: 8px;">
+                  (총 {{ rows|length }}개 결과)
+                </span>
+              </div>
+              
+              {% if show_all_button %}
+                <div>
+                  <a href="/view?q={{ q|urlencode }}&show_all=1" style="padding: 8px 16px; background: #4a5d7e; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; transition: background 0.2s; display: inline-block;">
+                    전체 보기
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+            
+            <!-- 필터 및 정렬 UI -->
+            {% if parsed.group_by == 'step_name' %}
+              <div style="margin-bottom: 12px; padding: 12px; background: #1a2332; border-radius: 8px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 1; min-width: 200px;">
+                  <input type="text" id="stepFilter" placeholder="단계명 검색..." 
+                         style="width: 100%; padding: 8px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: #0f1624; color: #e0e0e0; font-size: 14px;" />
+                </div>
+                <div>
+                  <select id="sortBy" style="padding: 8px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: #0f1624; color: #e0e0e0; font-size: 14px; cursor: pointer;">
+                    <option value="value_desc">값 큰 순</option>
+                    <option value="value_asc">값 작은 순</option>
+                    <option value="name_asc">이름순 (A-Z)</option>
+                    <option value="name_desc">이름순 (Z-A)</option>
+                  </select>
+                </div>
+              </div>
+            {% endif %}
+            
           <div style="overflow-x: auto;">
             <table>
               <thead>
@@ -315,18 +397,32 @@
                         <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(계산된 값)</span>
                       {% elif k == "n" %}
                         <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(개수)</span>
+                      {% elif k == "std" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(표준편차)</span>
+                      {% elif k == "min_val" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(최소값)</span>
+                      {% elif k == "max_val" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(최대값)</span>
+                      {% elif k == "diff" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(차이)</span>
+                      {% elif k == "outlier_count" %}
+                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(이상치 개수)</span>
                       {% endif %}
                     </th>
                   {% endfor %}
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="tableBody">
                 {% for r in rows %}
-                  <tr>
+                  <tr data-step-name="{{ r.get('step_name', '')|lower }}" data-value="{{ r.get('value', 0)|replace(',', '')|float if r.get('value') else 0 }}">
                     {% for k, v in r.items() %}
                       <td>
-                        {% if k == "value" or k == "n" %}
+                        {% if k == "value" or k == "diff" or k == "diff_signed" or k == "trace1_avg" or k == "trace2_avg" %}
                           <strong style="color: #7c9ed9;">{{ v }}</strong>
+                        {% elif k == "n" or k == "outlier_count" %}
+                          <strong style="color: #aaffaa;">{{ v }}</strong>
+                        {% elif k == "std" or k == "min_val" or k == "max_val" or k == "avg_diff" %}
+                          <span style="color: #ffd93d;">{{ v }}</span>
                         {% else %}
                           {{ v }}
                         {% endif %}

@@ -1,4 +1,4 @@
-import duckdb
+import duckdb  # type: ignore
 from pathlib import Path
 import re
 
