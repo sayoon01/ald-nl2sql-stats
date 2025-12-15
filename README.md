@@ -258,7 +258,3 @@ step=STANDBY와 step=B.FILL5 pressact 평균 비교
 - `data_out/ald.duckdb` 파일이 존재하는지 확인
 - `preprocess_duckdb.py`를 실행했는지 확인
 
-## 라이센스
-
-이 프로젝트는 내부 사용을 위한 것입니다.
-
