@@ -2,8 +2,10 @@ import duckdb  # type: ignore
 from pathlib import Path
 import re
 
-IN_GLOB = str(Path.home() / "standard_traces" / "*.csv")
-OUT_DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+# 프로젝트 루트 경로 설정
+PROJECT_ROOT = Path(__file__).parent.parent
+IN_GLOB = str(Path.home() / "standard_traces" / "*.csv")  # CSV 파일 위치는 사용자 홈 디렉토리 기준
+OUT_DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def slugify(name: str) -> str:
     name = name.strip().lower()

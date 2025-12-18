@@ -1,0 +1,52 @@
+# 컬럼 동의어 사전
+# 자연어 질문에서 컬럼을 인식하기 위한 동의어
+
+pressact:
+  - 챔버 압력
+  - 챔버압
+  - 압력
+  - 진공
+  - 챔버 진공
+  - pressure
+  - 압력 실측
+  - 현재 압력
+  - 실측 압력
+
+pressset:
+  - 압력 설정
+  - set pressure
+  - 설정 압력
+  - 목표 압력
+
+vg11:
+  - vg11
+  - 게이지11
+  - 진공게이지11
+  - 진공 게이지 11
+  - vacuum gauge 11
+
+vg12:
+  - vg12
+  - 게이지12
+  - 진공게이지12
+  - 진공 게이지 12
+  - vacuum gauge 12
+
+vg13:
+  - vg13
+  - 게이지13
+  - 진공게이지13
+  - 진공 게이지 13
+  - vacuum gauge 13
+
+apcvalvemon:
+  - apc 밸브 모니터
+  - apc 모니터
+  - apc 밸브
+  - apc valve monitor
+
+apcvalveset:
+  - apc 밸브 설정
+  - apc 설정
+  - apc valve set
+

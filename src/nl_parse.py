@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional, Literal, List
 from datetime import datetime
+from domain.rules.normalization import normalize
+from domain.rules.resolution import resolve_column_from_text
 
 Agg = Literal["avg", "min", "max", "count", "std", "stddev", "p50", "median", "p95", "p99", "null_ratio"]
 GroupBy = Optional[Literal["trace_id", "step_name", "date", "hour", "day"]]
@@ -125,7 +127,11 @@ class Parsed:
     is_outlier: bool = False  # 이상치 탐지
     is_trace_compare: bool = False  # 두 trace 비교
 
-def parse_question(q: str) -> Parsed:
+def parse_question(question: str) -> Parsed:
+    # 정규화 적용
+    norm = normalize(question)
+    q = norm.text
+    
     text = q.strip()
 
     agg = _pick_agg(text)
@@ -185,12 +191,16 @@ def parse_question(q: str) -> Parsed:
     else:
         analysis_type = "ranking"
     
+    # 모호성 해결 (예: "VG11 압력" => vg11, pressact 제거)
+    col = resolve_column_from_text(text, col)
+    
     # overshoot, 이상치 탐지, trace 비교는 pressact 기본값 사용
     if (is_overshoot or is_outlier or is_trace_compare) and col is None:
         col = "pressact"
-
-    if agg != "count" and col is None and not (is_outlier or is_dwell_time or is_overshoot or is_trace_compare):
-        raise ValueError("지표를 못 찾았어. 예: 'pressact 평균', '압력 최대'")
+    
+    # 컬럼이 없으면 기본값 사용 (정규화된 텍스트에서는 컬럼이 이미 변환되었을 수 있음)
+    if col is None:
+        col = "pressact"  # 기본 컬럼
 
     return Parsed(
         agg=agg,

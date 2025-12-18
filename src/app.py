@@ -14,10 +14,75 @@ import io
 import json
 from datetime import datetime
 
-# 한글 폰트 설정 (macOS에서 사용 가능한 폰트 우선 사용)
-plt.rcParams['font.family'] = 'Apple SD Gothic Neo'  # macOS 기본 한글 폰트
+# 한글 폰트 설정 (Linux 환경)
+# Linux에서 사용 가능한 한글 폰트 우선 시도
+try:
+    import matplotlib.font_manager as fm
+    
+    # 사용 가능한 폰트 목록
+    font_list = [f.name for f in fm.fontManager.ttflist]
+    
+    # 한글 지원 폰트 우선순위
+    korean_font_candidates = [
+        'NanumGothic',
+        'NanumBarunGothic', 
+        'Noto Sans CJK KR',
+        'Noto Sans CJK JP',  # 일본어 폰트도 한글 지원
+        'Noto Sans CJK SC',  # 중국어 간체도 한글 지원
+        'Noto Sans CJK TC',  # 중국어 번체도 한글 지원
+        'Noto Sans CJK',     # 일반 Noto Sans CJK
+    ]
+    
+    # 폰트 찾기 (부분 매칭 포함)
+    selected_font = None
+    for candidate in korean_font_candidates:
+        # 정확한 매칭
+        if candidate in font_list:
+            selected_font = candidate
+            break
+        # 부분 매칭 (예: "Noto Sans CJK"로 시작하는 폰트)
+        for font_name in font_list:
+            if candidate.lower() in font_name.lower() or font_name.lower() in candidate.lower():
+                selected_font = font_name
+                break
+        if selected_font:
+            break
+    
+    if selected_font:
+        plt.rcParams['font.family'] = selected_font
+        print(f"[Font] 한글 폰트 설정: {selected_font}")
+    else:
+        # 폰트 파일 경로에서 직접 찾기
+        for font_prop in fm.fontManager.ttflist:
+            font_path = str(font_prop.fname).lower()
+            if 'noto' in font_path and ('cjk' in font_path or 'korean' in font_path):
+                plt.rcParams['font.family'] = font_prop.name
+                print(f"[Font] 한글 폰트 설정 (경로 기반): {font_prop.name}")
+                break
+        else:
+            # 마지막 fallback: DejaVu Sans (한글 미지원이지만 깨지지 않게)
+            plt.rcParams['font.family'] = 'DejaVu Sans'
+            print("[Font] 한글 폰트를 찾을 수 없어 DejaVu Sans 사용 (한글 깨짐 가능)")
+            
+except Exception as e:
+    plt.rcParams['font.family'] = 'DejaVu Sans'
+    print(f"[Font] 폰트 설정 오류: {e}, DejaVu Sans 사용")
+
 plt.rcParams['axes.unicode_minus'] = False  # 음수 기호 깨짐 방지
-from src.nl_parse import parse_question
+
+# 폰트 캐시 재로드 (한글 폰트가 제대로 적용되도록)
+try:
+    fm._rebuild()
+except:
+    pass
+# 기존 파서와 새 파서 선택 가능
+try:
+    from src.nl_parse_v2 import parse_question  # 새 도메인 메타데이터 기반 파서
+except ImportError:
+    from src.nl_parse import parse_question  # 기존 파서 (fallback)
+
+# 정규화 함수 import
+from domain.rules.normalization import normalize
 from src.sql_builder import build_sql
 from src.process_metrics import (
     build_stable_avg_sql,
@@ -28,10 +93,12 @@ from src.process_metrics import (
 )
 from src.chart_templates import get_chart_template, apply_chart_template
 
-DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+# 프로젝트 루트 경로 설정
+PROJECT_ROOT = Path(__file__).parent.parent
+DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 app = FastAPI(title="ALD NL→SQL Stats API")
-templates = Jinja2Templates(directory=str(Path.home() / "ald_app" / "templates"))
+templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 
 class QueryIn(BaseModel):
     question: str
@@ -115,7 +182,16 @@ def make_summary(parsed: dict, rows: list) -> str:
         top = rows[0]
         key = parsed["group_by"]
         key_kr = "공정 ID" if key == "trace_id" else ("단계명" if key == "step_name" else key)
-        summary = f"{scope_txt}{col} {agg_kr} ({key_kr}별 Top {len(rows)}). 1위={top.get(key)}: {top.get('value')}"
+        
+        # 요청한 top_n과 실제 반환된 개수 비교
+        requested_top_n = parsed.get("top_n")
+        actual_count = len(rows)
+        
+        if requested_top_n and actual_count < requested_top_n:
+            summary = f"{scope_txt}{col} {agg_kr} ({key_kr}별 Top {requested_top_n} 요청, 실제 {actual_count}개 반환). 1위={top.get(key)}: {top.get('value')}"
+            summary += f" (데이터가 {requested_top_n}개보다 적습니다)"
+        else:
+            summary = f"{scope_txt}{col} {agg_kr} ({key_kr}별 Top {actual_count}). 1위={top.get(key)}: {top.get('value')}"
         
         # 추가 통계 정보 (n, std, min, max)가 있으면 표시
         if "n" in top:
@@ -177,12 +253,17 @@ def make_summary(parsed: dict, rows: list) -> str:
 
 @app.post("/query")
 def query(q: QueryIn):
+    # 정규화
+    norm = normalize(q.question)
+    
     try:
         parsed_obj = parse_question(q.question)
     except Exception as e:
         return {
             "ok": False,
             "error": str(e),
+            "question": norm.raw,
+            "normalized": norm.text,
             "hint_examples": [
                 "standard_trace_001 pressact 평균",
                 "standard_trace_001 스텝별 pressact 평균",
@@ -222,7 +303,8 @@ def query(q: QueryIn):
 
     return {
         "ok": True,
-        "question": q.question,
+        "question": norm.raw,  # 원문 질문
+        "normalized": norm.text,  # 정규화된 질문
         "parsed": parsed,
         "sql": sql.strip(),
         "rows": rows,
@@ -318,7 +400,9 @@ def view(request: Request, q: str | None = None, show_all: str | None = None):
             "index.html",
             {
                 "request": request, 
-                "q": q, 
+                "q": q,  # 원문 질문
+                "question_raw": norm.raw,  # 원문 질문 (명시적)
+                "question_normalized": norm.text,  # 정규화된 질문
                 "parsed": parsed, 
                 "sql": sql.strip(), 
                 "rows": rows, 
@@ -328,7 +412,16 @@ def view(request: Request, q: str | None = None, show_all: str | None = None):
             },
         )
     except Exception as e:
-        return templates.TemplateResponse("index.html", {"request": request, "q": q, "error": str(e)})
+        return templates.TemplateResponse(
+            "index.html", 
+            {
+                "request": request, 
+                "q": q,
+                "question_raw": norm.raw,
+                "question_normalized": norm.text,
+                "error": str(e)
+            }
+        )
 
 # ✅ PNG plot (브라우저에서 바로 열리는 엔드포인트)
 @app.get("/plot")
@@ -579,7 +672,7 @@ def download_csv(q: str):
         return {"ok": False, "error": str(e)}
 
 # ✅ 히스토리 저장/조회 (간단한 JSON 파일 기반)
-HISTORY_FILE = Path.home() / "ald_app" / "data" / "history.json"
+HISTORY_FILE = PROJECT_ROOT / "data" / "history.json"
 
 @app.post("/api/history")
 def save_history(q: QueryIn):
@@ -616,7 +709,7 @@ def get_history():
         return {"ok": False, "error": str(e)}
 
 # ✅ 즐겨찾기 저장/조회
-FAVORITES_FILE = Path.home() / "ald_app" / "data" / "favorites.json"
+FAVORITES_FILE = PROJECT_ROOT / "data" / "favorites.json"
 
 @app.post("/api/favorites")
 def save_favorite(q: QueryIn):

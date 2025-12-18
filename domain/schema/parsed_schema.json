@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Parsed Question Schema",
+  "description": "자연어 질문 파싱 결과의 표준 스키마. 이 스키마는 절대 변경되지 않아야 하는 중간 표현입니다.",
+  "type": "object",
+  "required": ["metric", "column"],
+  "properties": {
+    "metric": {
+      "type": "string",
+      "enum": ["avg", "min", "max", "count", "std", "stddev", "p50", "median", "p95", "p99", "null_ratio"],
+      "description": "집계 함수/지표"
+    },
+    "column": {
+      "type": ["string", "null"],
+      "description": "분석할 컬럼명 (DB 컬럼명)"
+    },
+    "group_by": {
+      "type": ["string", "null"],
+      "enum": [null, "trace_id", "step_name", "date", "hour", "day"],
+      "description": "그룹핑 기준"
+    },
+    "filters": {
+      "type": "object",
+      "description": "필터 조건",
+      "properties": {
+        "trace_id": {
+          "type": ["string", "null"],
+          "description": "단일 공정 ID 필터"
+        },
+        "trace_ids": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "여러 공정 ID 필터 (비교용)"
+        },
+        "step_name": {
+          "type": ["string", "null"],
+          "description": "단일 단계명 필터"
+        },
+        "step_names": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "여러 단계명 필터 (비교용)"
+        },
+        "date_start": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "시작 날짜 (YYYY-MM-DD)"
+        },
+        "date_end": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "종료 날짜 (YYYY-MM-DD)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "top_n": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "상위 N개 제한"
+    },
+    "analysis_type": {
+      "type": "string",
+      "enum": ["ranking", "group_profile", "comparison", "stability"],
+      "description": "분석 유형"
+    },
+    "flags": {
+      "type": "object",
+      "description": "특수 분석 플래그",
+      "properties": {
+        "is_trace_compare": {
+          "type": "boolean",
+          "description": "공정 비교 분석"
+        },
+        "is_outlier": {
+          "type": "boolean",
+          "description": "이상치 탐지"
+        },
+        "is_dwell_time": {
+          "type": "boolean",
+          "description": "체류 시간 분석"
+        },
+        "is_overshoot": {
+          "type": "boolean",
+          "description": "오버슈트 분석"
+        },
+        "is_stable_avg": {
+          "type": "boolean",
+          "description": "안정화 구간 평균"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+

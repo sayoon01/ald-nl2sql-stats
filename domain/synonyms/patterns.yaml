@@ -1,0 +1,35 @@
+# 패턴 동의어 (정규화용)
+
+top_n:
+  patterns:
+    - "top\\s*(\\d+)"
+    - "상위\\s*(\\d+)"
+    - "위\\s*(\\d+)"
+    - "top(\\d+)"
+  normalize: "top{0}"
+
+step_filter:
+  patterns:
+    # step=STANDBY, step:STANDBY 형식만 매칭 (step별은 제외)
+    - "(step|스텝|단계)\\s*[:=]\\s*([a-z0-9_]+)"
+  normalize: "step={1}"
+
+date_range:
+  patterns:
+    - "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})\\s*부터"
+    - "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})\\s*~\\s*(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})"
+    - "(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})\\s*-\\s*(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})"
+  normalize: "range={0}-{1}"
+
+trace_id:
+  patterns:
+    - "(standard_trace_\\d{3})"
+    - "(trace_\\d{3})"
+  normalize: "{0}"
+
+comparison:
+  patterns:
+    - "(.+?)\\s*(과|와|vs|versus)\\s*(.+)"
+    - "(.+?)\\s*비교"
+  normalize: "compare:{0}:{1}"
+

@@ -1,0 +1,45 @@
+# 그룹핑 정의
+
+trace_id:
+  label: 공정
+  description: 공정/레시피 단위 그룹핑
+  sql_expr: trace_id
+  type: categorical
+
+step_name:
+  label: 스텝
+  description: 공정 단계별 그룹핑
+  sql_expr: step_name
+  type: categorical
+
+day:
+  label: 일별
+  description: 날짜별 그룹핑
+  sql_expr: DATE(timestamp)
+  type: temporal
+
+date:
+  label: 일별
+  description: 날짜별 그룹핑 (별칭)
+  sql_expr: DATE(timestamp)
+  type: temporal
+
+hour:
+  label: 시간별
+  description: 시간대별 그룹핑
+  sql_expr: DATE_TRUNC('hour', timestamp)
+  type: temporal
+
+# 확장 가능한 그룹핑
+# week:
+#   label: 주별
+#   description: 주 단위 그룹핑
+#   sql_expr: DATE_TRUNC('week', timestamp)
+#   type: temporal
+# 
+# month:
+#   label: 월별
+#   description: 월 단위 그룹핑
+#   sql_expr: DATE_TRUNC('month', timestamp)
+#   type: temporal
+

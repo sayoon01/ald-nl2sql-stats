@@ -1,0 +1,16 @@
+{"q": "챔버 압력 평균", "expect": {"metric": "avg", "column": "pressact"}}
+{"q": "압력 최대", "expect": {"metric": "max", "column": "pressact"}}
+{"q": "pressact 평균", "expect": {"metric": "avg", "column": "pressact"}}
+{"q": "vg11 표준편차", "expect": {"metric": "std", "column": "vg11"}}
+{"q": "공정별 pressact 평균 top5", "expect": {"metric": "avg", "column": "pressact", "group_by": "trace_id", "top_n": 5, "analysis_type": "ranking"}}
+{"q": "standard_trace_001 스텝별 pressact 평균", "expect": {"metric": "avg", "column": "pressact", "group_by": "step_name", "filters": {"trace_id": "standard_trace_001"}, "analysis_type": "group_profile"}}
+{"q": "pressact 일별 평균", "expect": {"metric": "avg", "column": "pressact", "group_by": "date", "analysis_type": "group_profile"}}
+{"q": "standard_trace_001과 standard_trace_002 pressact 비교", "expect": {"metric": "avg", "column": "pressact", "filters": {"trace_ids": ["standard_trace_001", "standard_trace_002"]}, "flags": {"is_trace_compare": true}, "analysis_type": "comparison"}}
+{"q": "standard_trace_001 step=STANDBY pressact 최대", "expect": {"metric": "max", "column": "pressact", "filters": {"trace_id": "standard_trace_001", "step_name": "STANDBY"}}}
+{"q": "공정별 압력 평균은 높은거 5개 알려주세요", "expect": {"metric": "avg", "column": "pressact", "group_by": "trace_id", "top_n": 5, "analysis_type": "ranking"}}
+{"q": "pressact 이상치 top5", "expect": {"metric": "avg", "column": "pressact", "top_n": 5, "flags": {"is_outlier": true}, "analysis_type": "stability"}}
+{"q": "pressact overshoot top10", "expect": {"metric": "avg", "column": "pressact", "top_n": 10, "flags": {"is_overshoot": true}, "analysis_type": "stability"}}
+{"q": "2024-01-01부터 pressact 평균", "expect": {"metric": "avg", "column": "pressact", "filters": {"date_start": "2024-01-01"}}}
+{"q": "상위 3개", "expect": {"top_n": 3}}
+{"q": "3개 알려주세요", "expect": {"top_n": 3}}
+
