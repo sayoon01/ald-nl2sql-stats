@@ -6,6 +6,22 @@ primary_table: "traces"
 # aliases: 사용자가 말할 법한 표현(한글/영문/약어)
 # csv_columns: DuckDB 테이블에 존재하는 정확한 컬럼명(대소문자/특수문자 포함)
 
+# 화면 표시/반올림 기본 규칙 (컬럼이 늘어나도 코드 수정 최소화)
+defaults:
+  # physical_type별 기본 소수점 자리수
+  decimals_by_type:
+    pressure: 3
+    flow: 1
+    temperature: 1
+    valve: 2
+
+  # unit 코드 -> 화면 표시용 라벨
+  unit_label:
+    mTorr: "mTorr"
+    sccm: "sccm"
+    C: "°C"
+    pct: "%"
+
 columns:
   pressact:
     domain_name: "챔버 압력"
@@ -25,6 +41,7 @@ columns:
     domain_name: "진공 게이지 11 압력"
     physical_type: "pressure"
     unit: "mTorr"
+    decimals: 2
     csv_columns: ["VG11"]
     aliases: ["vg11", "게이지11", "진공게이지11", "vacuum gauge 11"]
 
@@ -32,6 +49,7 @@ columns:
     domain_name: "진공 게이지 12 압력"
     physical_type: "pressure"
     unit: "mTorr"
+    decimals: 2
     csv_columns: ["VG12"]
     aliases: ["vg12", "게이지12", "진공게이지12", "vacuum gauge 12"]
 
@@ -39,6 +57,7 @@ columns:
     domain_name: "진공 게이지 13 압력"
     physical_type: "pressure"
     unit: "mTorr"
+    decimals: 2
     csv_columns: ["VG13"]
     aliases: ["vg13", "게이지13", "진공게이지13", "vacuum gauge 13"]
 
