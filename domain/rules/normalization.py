@@ -107,24 +107,42 @@ class Normalizer:
         내부 동의어 치환 메서드 (normalize()에서 사용)
         사용자 제공 코드의 로직 활용: 단순 replace로 더 정확한 매칭
         """
-        # 동의어를 길이 순으로 정렬 (긴 것 우선) - 부분 매칭 방지
+        # 동의어를 길이 순으로 정렬 (긴 것부터) - 부분 매칭 방지
         sorted_synonyms = sorted(
             self.synonym_to_standard.items(),
             key=lambda x: len(x[0]),
             reverse=True
         )
         
+        # 이미 변환된 컬럼명 패턴 (mfcmon_xxx, pressact 등)
+        # 이런 패턴이 포함된 부분은 다시 변환하지 않음
+        column_pattern = re.compile(r'\b(mfcmon_|press|vg|temp|apc)\w+\b', re.IGNORECASE)
+        
         for synonym, (category, std_name) in sorted_synonyms:
-            # 단순 replace 사용 (사용자 코드 방식)
-            # 소문자로 변환된 텍스트에서 소문자 동의어로 매칭
             synonym_lower = synonym.lower()
+            
+            # 단어 경계를 고려한 매칭 (이미 변환된 컬럼명 내부는 제외)
+            if category == "column":
+                # 컬럼명 패턴이 이미 있는 경우, 그 내부의 synonym는 스킵
+                matches = list(column_pattern.finditer(text))
+                skip = False
+                for match in matches:
+                    match_start, match_end = match.span()
+                    # synonym가 매칭된 컬럼명 내부에 있는지 확인
+                    synonym_pos = text.find(synonym_lower)
+                    if synonym_pos != -1 and synonym_pos >= match_start and synonym_pos < match_end:
+                        skip = True
+                        break
+                if skip:
+                    continue
+            
+            # 단순 replace 사용 (긴 것부터 매칭하므로 부분 매칭 문제 최소화)
             if synonym_lower in text:
                 # 그룹핑은 "group:" 접두사 추가
                 if category == "group":
                     replacement = f"group:{std_name}"
                 else:
                     replacement = std_name
-                # 단순 replace (긴 것부터 매칭하므로 부분 매칭 문제 최소화)
                 text = text.replace(synonym_lower, replacement)
         
         return text
@@ -221,19 +239,48 @@ def _normalize_step_filter(text: str) -> str:
 
     return text
 
+def _split_compound_words(text: str) -> str:
+    """
+    한국어 복합명사 분리 (접합어 분리)
+    예: "암모니아가스" -> "암모니아 가스", "질소유량" -> "질소 유량"
+    """
+    # 도메인에서 자주 붙는 접미어 패턴
+    compound_patterns = [
+        (r"([가-힣]+)(가스)", r"\1 \2"),  # 암모니아가스 -> 암모니아 가스
+        (r"([가-힣]+)(유량)", r"\1 \2"),  # 질소유량 -> 질소 유량
+        (r"([가-힣]+)(압력)", r"\1 \2"),  # 챔버압력 -> 챔버 압력
+        (r"([가-힣]+)(온도)", r"\1 \2"),  # 상부온도 -> 상부 온도
+        (r"([가-힣]+)(밸브)", r"\1 \2"),  # apc밸브 -> apc 밸브
+        (r"([가-힣]+)(게이지)", r"\1 \2"),  # 진공게이지 -> 진공 게이지
+        (r"([가-힣]+)(스텝)", r"\1 \2"),  # bfill스텝 -> bfill 스텝
+        (r"([가-힣]+)(단계)", r"\1 \2"),  # standby단계 -> standby 단계
+        (r"([가-힣]+)(공정)", r"\1 \2"),  # 표준공정 -> 표준 공정
+        (r"([가-힣]+)(트레이스)", r"\1 \2"),  # standard트레이스 -> standard 트레이스
+    ]
+    
+    result = text
+    for pattern, replacement in compound_patterns:
+        result = re.sub(pattern, replacement, result)
+    
+    return result
+
 def normalize(raw_text: str) -> Normalized:
     """
     Deterministic normalization:
     1) lowercase
     2) normalize whitespace
-    3) normalize top-n (5개 -> top5)
-    4) normalize filters (step=...)
-    5) replace synonyms (columns, metrics, groups)
+    3) split compound words (접합어 분리)
+    4) normalize top-n (5개 -> top5)
+    5) normalize filters (step=...)
+    6) replace synonyms (columns, metrics, groups)
     
     Returns: Normalized 객체 (raw, text)
     """
     text = raw_text.strip().lower()
     text = _collapse_spaces(text)
+    
+    # 접합어 분리 (동의어 치환 전에 수행)
+    text = _split_compound_words(text)
 
     # 패턴 정규화 (동의어 치환 전에 수행)
     text = _normalize_topn(text)

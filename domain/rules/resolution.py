@@ -23,6 +23,7 @@ def resolve_column_ambiguity(tokens: List[str], current_column: Optional[str]) -
     """
     모호한 컬럼 선택 해결
     예: "VG11 압력" => vg11 (pressact 제거)
+    예: "압력" => pressact (기본값)
     """
     rules = load_resolution_rules()
     resolution = rules.get("resolution", {})
@@ -54,11 +55,13 @@ def resolve_column_ambiguity(tokens: List[str], current_column: Optional[str]) -
         if any(token.lower() in [t.lower() for t in tokens] for token in if_any_tokens):
             return prefer_column
     
-    # 3. 기본값
+    # 3. 기본값 적용
     defaults = resolution.get("defaults", {})
-    if current_column is None:
-        # 컬럼이 없으면 기본값 사용 (나중에 fallback에서 처리)
-        pass
+    # "압력"만 입력했을 때 기본값 사용
+    if current_column is None or (current_column == "pressact" and "압력" in tokens and len(tokens) == 1):
+        generic_pressure = defaults.get("generic_pressure_column")
+        if generic_pressure:
+            return generic_pressure
     
     return current_column
 

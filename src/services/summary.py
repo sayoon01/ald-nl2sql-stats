@@ -1,36 +1,60 @@
 """
 결과 요약 생성 서비스
 """
-from typing import List, Dict
+from typing import List, Dict, Union
+from src.nl_parse_v2 import Parsed
 
 
-def make_summary(parsed: dict, rows: list) -> str:
+def make_summary(parsed: Union[Parsed, dict], rows: Union[List[Dict], 'pd.DataFrame']) -> str:
     """쿼리 결과를 자연어 요약으로 변환"""
+    # Parsed 객체를 딕셔너리로 변환 (하위 호환성)
+    if isinstance(parsed, Parsed):
+        parsed_dict = {
+            "agg": parsed.agg,
+            "metric": parsed.metric,
+            "col": parsed.col,
+            "column": parsed.column,
+            "group_by": parsed.group_by,
+            "top_n": parsed.top_n,
+            "trace_id": parsed.trace_id,
+            "step_name": parsed.step_name,
+            "is_trace_compare": parsed.is_trace_compare,
+            "trace_ids": parsed.trace_ids,
+            "is_outlier": parsed.is_outlier,
+        }
+    else:
+        parsed_dict = parsed
+    
+    # rows가 DataFrame이면 리스트로 변환
+    import pandas as pd
+    if isinstance(rows, pd.DataFrame):
+        rows = rows.to_dict('records')
+    
     agg_kr_map = {
         "avg": "평균", "min": "최소", "max": "최대", "count": "개수",
         "std": "표준편차", "stddev": "표준편차", "p50": "중앙값", "median": "중앙값",
         "p95": "95퍼센타일", "p99": "99퍼센타일", "null_ratio": "결측률"
     }
-    agg = parsed.get("agg") or parsed.get("metric", "avg")
+    agg = parsed_dict.get("agg") or parsed_dict.get("metric", "avg")
     agg_kr = agg_kr_map.get(agg, agg)
-    col = parsed.get("col") or "*"
+    col = parsed_dict.get("col") or parsed_dict.get("column") or "*"
     scope = []
-    if parsed.get("trace_id"):
-        scope.append(parsed["trace_id"])
-    if parsed.get("step_name"):
-        scope.append(f"step={parsed['step_name']}")
+    if parsed_dict.get("trace_id"):
+        scope.append(parsed_dict["trace_id"])
+    if parsed_dict.get("step_name"):
+        scope.append(f"step={parsed_dict['step_name']}")
     scope_txt = (", ".join(scope) + " 기준 ") if scope else ""
 
     if not rows:
         return f"결과가 없습니다. ({scope_txt}{col} {agg_kr})"
 
-    if parsed.get("group_by"):
+    if parsed_dict.get("group_by"):
         top = rows[0]
-        key = parsed["group_by"]
+        key = parsed_dict["group_by"]
         key_kr = "공정 ID" if key == "trace_id" else ("단계명" if key == "step_name" else key)
         
         # 요청한 top_n과 실제 반환된 개수 비교
-        requested_top_n = parsed.get("top_n")
+        requested_top_n = parsed_dict.get("top_n")
         actual_count = len(rows)
         
         if requested_top_n and actual_count < requested_top_n:
@@ -49,9 +73,9 @@ def make_summary(parsed: dict, rows: list) -> str:
         return summary
     
     # trace 비교 케이스
-    if parsed.get("is_trace_compare") and rows:
+    if parsed_dict.get("is_trace_compare") and rows:
         top = rows[0]
-        trace_ids = parsed.get("trace_ids", [])
+        trace_ids = parsed_dict.get("trace_ids", [])
         if len(trace_ids) >= 2:
             step_name = top.get('step_name', '')
             diff_val = top.get('diff', 0)
@@ -78,7 +102,7 @@ def make_summary(parsed: dict, rows: list) -> str:
             return summary
     
     # 이상치 탐지 케이스
-    if parsed.get("is_outlier"):
+    if parsed_dict.get("is_outlier"):
         if not rows:
             return "이상치가 발견되지 않았습니다. (z-score > 1.0 기준)"
         top = rows[0]

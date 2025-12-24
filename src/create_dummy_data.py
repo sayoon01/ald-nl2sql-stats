@@ -52,6 +52,20 @@ def create_dummy_data():
                     pressact = random.uniform(2.0, 8.0)
                     pressset = 5.0
                 
+                # MFC 유량 데이터 (단계별로 다른 범위)
+                if step_name in ['B.FILL', 'B.FILL4', 'B.FILL5', 'PROCESS']:
+                    mfcmon_n2_1 = random.uniform(10.0, 50.0)  # 질소 유량
+                    mfcmon_n2_2 = random.uniform(5.0, 30.0)   # 질소 유량 2
+                    mfcmon_nh3 = random.uniform(1.0, 20.0)   # 암모니아 유량
+                else:
+                    mfcmon_n2_1 = random.uniform(0.0, 10.0)
+                    mfcmon_n2_2 = random.uniform(0.0, 5.0)
+                    mfcmon_nh3 = random.uniform(0.0, 2.0)
+                
+                # 온도 데이터
+                tempact_c = random.uniform(20.0, 80.0)  # 중앙 온도
+                tempact_u = random.uniform(25.0, 85.0)  # 상부 온도
+                
                 rows.append({
                     'trace_id': trace_id,
                     'step_name': step_name,
@@ -63,6 +77,12 @@ def create_dummy_data():
                     'vg13': round(random.uniform(0.0, 100.0), 2),
                     'apcvalvemon': round(random.uniform(0.0, 100.0), 2),
                     'apcvalveset': round(random.uniform(0.0, 100.0), 2),
+                    # 추가 컬럼
+                    'mfcmon_n2_1': round(mfcmon_n2_1, 1),
+                    'mfcmon_n2_2': round(mfcmon_n2_2, 1),
+                    'mfcmon_nh3': round(mfcmon_nh3, 1),
+                    'tempact_c': round(tempact_c, 1),
+                    'tempact_u': round(tempact_u, 1),
                 })
     
     # DataFrame 생성
@@ -74,10 +94,11 @@ def create_dummy_data():
         SELECT * FROM df
     """)
     
-    # 분석용 뷰 생성
+    # 분석용 뷰 생성 (모든 주요 컬럼 포함)
     con.execute("""
         CREATE OR REPLACE VIEW traces_key AS
-        SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13
+        SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13,
+               mfcmon_n2_1, mfcmon_n2_2, mfcmon_nh3, tempact_c, tempact_u
         FROM traces
     """)
     

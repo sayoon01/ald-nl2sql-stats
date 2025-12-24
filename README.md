@@ -84,7 +84,7 @@ http://localhost:8000
 ```
 ald-nl2sql/
 ├── src/                    # 소스 코드
-│   ├── app.py             # FastAPI 웹 애플리케이션
+│   ├── app.py             # FastAPI 웹 애플리케이션 (메인 진입점)
 │   ├── nl_parse_v2.py     # 자연어 파서 (메인)
 │   ├── nl_parse.py        # 자연어 파서 (레거시)
 │   ├── sql_builder.py     # SQL 쿼리 생성기
@@ -92,7 +92,16 @@ ald-nl2sql/
 │   ├── run_query.py       # CLI 쿼리 테스트 도구
 │   ├── preprocess_duckdb.py # CSV → DuckDB 변환
 │   ├── create_dummy_data.py # 더미 데이터 생성
-│   └── chart_templates.py # 차트 템플릿
+│   ├── chart_templates.py # 차트 템플릿
+│   ├── utils/             # 유틸리티 모듈
+│   │   ├── mpl_korean.py  # Matplotlib 한글 폰트 설정
+│   │   └── parsed.py      # Parsed 객체 변환 유틸리티
+│   ├── services/          # 서비스 로직
+│   │   └── summary.py     # 요약 생성 서비스
+│   └── charts/            # 차트 렌더링 모듈
+│       ├── renderer.py    # 차트 렌더링 메인 로직
+│       ├── helpers.py     # 차트 헬퍼 함수
+│       └── title.py       # 차트 제목/라벨 생성
 ├── domain/                 # 도메인 메타데이터 (프로젝트 심장부)
 │   ├── schema/            # 스키마 정의
 │   │   ├── columns.yaml   # 컬럼 메타데이터
@@ -137,10 +146,15 @@ ald-nl2sql/
 
 **역할**: 애플리케이션의 핵심 로직이 담긴 디렉토리
 
+#### 메인 애플리케이션
+
 - **`app.py`**: FastAPI 웹 애플리케이션 메인 파일
-  - HTTP 엔드포인트 정의 (`/`, `/query`, `/view`)
-  - 질문 파싱 및 SQL 실행
-  - 차트 생성 및 HTML 렌더링
+  - HTTP 엔드포인트 정의 (`/`, `/view`, `/plot`)
+  - 질문 파싱 및 SQL 실행 (`choose_sql`, `run_query`)
+  - YAML 기반 컬럼 포맷팅 (`get_format_spec`, `format_value`)
+  - HTML 렌더링 및 결과 표시
+
+#### 파싱 및 SQL 생성
 
 - **`nl_parse_v2.py`**: 자연어 파서 (메인 버전)
   - 사용자 질문을 `Parsed` 객체로 변환
@@ -156,8 +170,43 @@ ald-nl2sql/
   - 집계 함수, 그룹핑, 필터링 처리
 
 - **`process_metrics.py`**: 지표 처리 로직
-  - 특수 지표 (overshoot, outlier 등) 처리
+  - 특수 지표 (overshoot, outlier, dwell_time, stable_avg, trace_compare) 처리
   - 커스텀 SQL 생성
+
+#### 유틸리티 모듈 (`src/utils/`)
+
+- **`mpl_korean.py`**: Matplotlib 한글 폰트 설정
+  - Linux 환경에서 사용 가능한 한글 폰트 자동 감지
+  - NanumGothic, Noto Sans CJK 등 지원
+  - 모듈 import 시 1회 실행
+
+- **`parsed.py`**: Parsed 객체 변환 유틸리티
+  - `to_parsed_dict()`: Parsed 객체를 딕셔너리로 변환
+  - `@property` 속성 포함하여 하위 호환성 보장
+
+#### 서비스 모듈 (`src/services/`)
+
+- **`summary.py`**: 요약 생성 서비스
+  - `make_summary()`: 쿼리 결과를 자연어 요약으로 변환
+  - 분석 유형별 요약 템플릿 제공
+
+#### 차트 모듈 (`src/charts/`)
+
+- **`renderer.py`**: 차트 렌더링 메인 로직
+  - `render_chart()`: DataFrame과 Parsed 객체를 받아 PNG 이미지 반환
+  - 차트 타입별 렌더링 (line, bar, horizontal_bar 등)
+
+- **`helpers.py`**: 차트 헬퍼 함수
+  - `strip_trailing_limit()`: SQL의 LIMIT 절 제거
+  - `add_others_row()`: Top N 외 나머지 데이터 요약
+  - `get_xy_columns()`: X/Y 축 컬럼 추출
+  - `apply_top_n_limit()`: Top N 제한 적용
+
+- **`title.py`**: 차트 제목/라벨 생성
+  - `get_korean_labels()`: 한글 라벨 변환
+  - `build_chart_title()`: 차트 제목 생성
+
+#### 기타 도구
 
 - **`run_query.py`**: CLI 쿼리 테스트 도구
   - 터미널에서 직접 질문 테스트
@@ -172,8 +221,7 @@ ald-nl2sql/
   - 실제 CSV가 없을 때 사용
 
 - **`chart_templates.py`**: 차트 템플릿
-  - Matplotlib 차트 생성 로직
-  - 한글 폰트 설정
+  - 차트 타입별 설정 (색상, 스타일 등)
 
 ### 📁 `domain/` - 도메인 메타데이터 (프로젝트 심장부)
 
@@ -185,6 +233,10 @@ ald-nl2sql/
   - 도메인 키 ↔ CSV 실제 컬럼명 매핑
   - 예: `pressact` → `PressAct` (CSV 컬럼명)
   - 동의어, 단위, 물리적 타입 정의
+  - **`defaults`**: 화면 표시/반올림 기본 규칙
+    - `decimals_by_type`: physical_type별 기본 소수점 자리수
+    - `unit_label`: unit 코드 → 화면 표시용 라벨
+  - 컬럼별 `decimals` 오버라이드 지원
 
 - **`metrics.yaml`**: 집계 함수 정의
   - `avg`, `max`, `min`, `std`, `p95` 등
@@ -301,28 +353,37 @@ ald-nl2sql/
 
 **주요 기능**:
 1. **HTTP 엔드포인트**:
-   - `GET /`: 메인 페이지 (질문 입력)
-   - `POST /query`: 질문 처리 및 JSON 응답
-   - `GET /view`: 질문 결과 페이지 (차트 포함)
+   - `GET /`: 메인 페이지 리다이렉트 (`/view`)
+   - `GET /view`: 질문 결과 페이지 (HTML 테이블 + 요약)
+   - `GET /plot`: 질문 결과 차트 (PNG 이미지)
 
 2. **질문 처리 파이프라인**:
    ```python
    질문 입력
    → normalize() (정규화)
    → parse_question() (파싱)
-   → build_sql() (SQL 생성)
-   → execute_query() (쿼리 실행)
+   → choose_sql() (SQL 빌더 선택)
+   → run_query() (SQL 실행)
+   → format_row() (결과 포맷팅)
    → make_summary() (요약 생성)
-   → generate_chart() (차트 생성)
+   → render_chart() (차트 생성)
    ```
 
-3. **한글 폰트 설정**:
-   - Linux 환경에서 사용 가능한 한글 폰트 자동 감지
-   - Matplotlib 차트에 한글 표시
+3. **YAML 기반 컬럼 포맷팅**:
+   - `load_schema()`: `columns.yaml` 로드
+   - `get_format_spec()`: 컬럼별 소수점 자리수 및 단위 라벨 조회
+   - `format_value()`: 값 포맷팅 (반올림 + 단위)
+
+4. **SQL 실행 통합**:
+   - `choose_sql()`: 분석 유형에 따라 적절한 SQL 빌더 선택
+   - `run_query()`: SQL 실행 및 결과 반환
 
 **주요 함수**:
-- `make_summary()`: 쿼리 결과를 자연어 요약으로 변환
-- `generate_chart()`: 데이터를 Matplotlib 차트로 시각화
+- `choose_sql(parsed_obj)`: SQL 빌더 선택 (trace_compare > overshoot > outlier > dwell_time > stable_avg > 기본)
+- `run_query(parsed_obj)`: SQL 실행 및 결과 반환
+- `get_format_spec(col_key)`: 컬럼별 포맷 스펙 조회 (decimals, unit_label)
+- `format_value(value, col, agg)`: 값 포맷팅
+- `format_row(row, parsed)`: 행 데이터 포맷팅
 
 #### `src/nl_parse_v2.py` - 자연어 파서 (메인)
 
@@ -370,6 +431,95 @@ sql = build_sql(parsed)
 # → "SELECT AVG(PressAct) as value FROM traces ORDER BY value DESC LIMIT 5"
 ```
 
+#### `src/utils/parsed.py` - Parsed 객체 변환 유틸리티
+
+**역할**: Parsed 객체를 딕셔너리로 변환 (하위 호환성 보장)
+
+**주요 함수**:
+- `to_parsed_dict(parsed_obj: Parsed) -> dict`: Parsed 객체를 딕셔너리로 변환
+  - `@property` 속성 (`agg`, `col`, `group_by` 등) 포함
+  - `filters`, `flags` 내부 속성도 평탄화하여 포함
+  - 템플릿에서 사용하기 위한 하위 호환성 보장
+
+**예시**:
+```python
+parsed_obj = parse_question("챔버 압력 평균")
+parsed_dict = to_parsed_dict(parsed_obj)
+# → {"metric": "avg", "column": "pressact", "agg": "avg", "col": "pressact", ...}
+```
+
+#### `src/utils/mpl_korean.py` - Matplotlib 한글 폰트 설정
+
+**역할**: Linux 환경에서 한글 폰트 자동 감지 및 설정
+
+**주요 함수**:
+- `setup_korean_font()`: 한글 폰트 설정
+  - NanumGothic, NanumBarunGothic, Noto Sans CJK KR 순서로 자동 감지
+  - 폰트를 찾지 못하면 DejaVu Sans 사용 (한글 깨짐 가능)
+  - 모듈 import 시 1회 실행
+
+**사용법**:
+```python
+from src.utils.mpl_korean import setup_korean_font
+setup_korean_font()  # app.py에서 한 번만 호출
+```
+
+#### `src/services/summary.py` - 요약 생성 서비스
+
+**역할**: 쿼리 결과를 자연어 요약으로 변환
+
+**주요 함수**:
+- `make_summary(parsed: dict, rows: list) -> str`: 쿼리 결과를 자연어 요약으로 변환
+  - 분석 유형별 요약 템플릿 제공
+  - ranking, group_profile, comparison 등 지원
+
+**예시**:
+```python
+parsed = {"metric": "avg", "column": "pressact", "analysis_type": "ranking"}
+rows = [{"value": 3.456}, {"value": 2.123}]
+summary = make_summary(parsed, rows)
+# → "챔버 압력 평균 상위 2개: 3.456 mTorr, 2.123 mTorr"
+```
+
+#### `src/charts/renderer.py` - 차트 렌더링 메인 로직
+
+**역할**: DataFrame과 Parsed 객체를 받아 PNG 이미지 반환
+
+**주요 함수**:
+- `render_chart(df: pd.DataFrame, parsed_obj: Parsed) -> Response`: 차트 렌더링
+  - 차트 타입별 렌더링 (line, bar, horizontal_bar 등)
+  - 한글 제목 및 라벨 자동 생성
+  - PNG 이미지로 반환
+
+**예시**:
+```python
+parsed_obj = parse_question("스텝별 압력 평균")
+sql, params, df = run_query(parsed_obj)
+chart_response = render_chart(df, parsed_obj)
+# → PNG 이미지 Response
+```
+
+#### `src/charts/helpers.py` - 차트 헬퍼 함수
+
+**역할**: 차트 데이터 준비 및 처리
+
+**주요 함수**:
+- `strip_trailing_limit(sql: str) -> str`: SQL의 LIMIT 절 제거
+- `add_others_row(df_top: pd.DataFrame, df_all: pd.DataFrame) -> pd.DataFrame`: Top N 외 나머지 데이터 요약
+- `get_xy_columns(df: pd.DataFrame) -> tuple[str, str]`: X/Y 축 컬럼 추출
+- `apply_top_n_limit(df: pd.DataFrame, config: dict, top_n: Optional[int]) -> pd.DataFrame`: Top N 제한 적용
+
+#### `src/charts/title.py` - 차트 제목/라벨 생성
+
+**역할**: 차트 제목 및 한글 라벨 생성
+
+**주요 함수**:
+- `get_korean_labels(parsed: dict, x_col: str, y_col: str) -> tuple[str, str, str, str]`: 한글 라벨 변환
+  - 집계 함수, 컬럼, X/Y 축 한글 변환
+- `build_chart_title(parsed: dict, col_kr: str, x_col_kr: str, y_col_kr: str, df_columns: list) -> str`: 차트 제목 생성
+  - 분석 유형별 제목 템플릿
+  - 필터 정보 포함
+
 #### `domain/rules/normalization.py` - 질문 정규화
 
 **역할**: 사용자 질문을 표준 형식으로 변환
@@ -406,10 +556,30 @@ class Normalized:
 
 #### `domain/schema/columns.yaml` - 컬럼 메타데이터
 
-**역할**: 도메인 키와 실제 CSV 컬럼명 매핑
+**역할**: 도메인 키와 실제 CSV 컬럼명 매핑 + 화면 표시/반올림 규칙
 
 **구조**:
 ```yaml
+version: 1
+dataset: "standard_traces"
+primary_table: "traces"
+
+# 화면 표시/반올림 기본 규칙
+defaults:
+  # physical_type별 기본 소수점 자리수
+  decimals_by_type:
+    pressure: 3
+    flow: 1
+    temperature: 1
+    valve: 2
+
+  # unit 코드 -> 화면 표시용 라벨
+  unit_label:
+    mTorr: "mTorr"
+    sccm: "sccm"
+    C: "°C"
+    pct: "%"
+
 columns:
   pressact:
     domain_name: "챔버 압력"
@@ -417,9 +587,21 @@ columns:
     unit: "mTorr"
     csv_columns: ["PressAct"]  # 실제 DB 컬럼명
     aliases: ["챔버 압력", "압력", "진공", "pressure"]
+    # decimals: 3 (기본값 사용, 생략 가능)
+
+  vg11:
+    domain_name: "진공 게이지 11 압력"
+    physical_type: "pressure"
+    unit: "mTorr"
+    decimals: 2  # 기본값(3) 오버라이드
+    csv_columns: ["VG11"]
+    aliases: ["vg11", "게이지11"]
 ```
 
-**핵심**: 코드에서는 `pressact` 같은 도메인 키만 사용하고, 실제 SQL에서는 `csv_columns`의 `PressAct`를 사용한다.
+**핵심**:
+- 코드에서는 `pressact` 같은 도메인 키만 사용하고, 실제 SQL에서는 `csv_columns`의 `PressAct`를 사용한다.
+- 포맷팅 규칙은 `defaults`에서 `physical_type`별로 정의하고, 컬럼별로 `decimals`를 오버라이드할 수 있다.
+- 컬럼 추가/단위 변경/자리수 변경은 YAML만 수정하면 자동 반영된다.
 
 ---
 
@@ -449,10 +631,11 @@ columns:
     - SQL 실행 및 결과 반환
     ↓
 [7. 결과 처리] src/app.py
-    - 요약 생성 (make_summary)
-    - 차트 생성 (generate_chart)
+    - 포맷팅 (format_value, format_row)
+    - 요약 생성 (make_summary from src/services/summary.py)
+    - 차트 생성 (render_chart from src/charts/renderer.py)
     ↓
-[8. 응답] JSON 또는 HTML
+[8. 응답] HTML 또는 PNG 이미지
 ```
 
 ### 상세 단계 설명
@@ -533,10 +716,18 @@ conn.execute(sql)
 
 **처리**:
 ```python
-make_summary(rows, parsed)
-# → "진공 게이지 11 압력 평균=3.456 mTorr"
+# 포맷팅
+decimals, unit_label = get_format_spec("vg11")
+# → (2, "mTorr")
+formatted_value = format_value(3.456, "vg11", "avg")
+# → "3.46 mTorr"
 
-generate_chart(rows, parsed)
+# 요약 생성
+summary = make_summary(parsed, rows)
+# → "진공 게이지 11 압력 평균=3.46 mTorr"
+
+# 차트 생성
+chart_response = render_chart(df, parsed_obj)
 # → PNG 이미지 (Matplotlib)
 ```
 
@@ -551,9 +742,10 @@ generate_chart(rows, parsed)
 **처리 과정**:
 1. 정규화: "pressact avg"
 2. 파싱: `Parsed(metric="avg", column="pressact")`
-3. SQL: `SELECT AVG(PressAct) as value FROM traces`
-4. 결과: `[{"value": 3.456}]`
-5. 요약: "챔버 압력 평균=3.456 mTorr"
+3. SQL 생성: `choose_sql()` → `build_sql()` → `SELECT AVG(PressAct) as value FROM traces`
+4. 쿼리 실행: `run_query()` → `[{"value": 3.456}]`
+5. 포맷팅: `get_format_spec("pressact")` → `(3, "mTorr")`, `format_value(3.456, "pressact", "avg")` → `"3.456 mTorr"`
+6. 요약: `make_summary(parsed, rows)` → "챔버 압력 평균=3.456 mTorr"
 
 ### 예시 2: 그룹핑 질문
 
@@ -562,9 +754,11 @@ generate_chart(rows, parsed)
 **처리 과정**:
 1. 정규화: "group:step_name pressact avg"
 2. 파싱: `Parsed(metric="avg", column="pressact", group_by="step_name")`
-3. SQL: `SELECT Step Name, AVG(PressAct) as value FROM traces GROUP BY Step Name`
-4. 결과: `[{"Step Name": "STANDBY", "value": 2.5}, ...]`
-5. 요약: "스텝별 챔버 압력 평균" + 차트
+3. SQL 생성: `choose_sql()` → `build_sql()` → `SELECT Step Name, AVG(PressAct) as value FROM traces GROUP BY Step Name`
+4. 쿼리 실행: `run_query()` → `[{"Step Name": "STANDBY", "value": 2.5}, ...]`
+5. 포맷팅: 각 행에 대해 `format_row()` 적용
+6. 요약: `make_summary(parsed, rows)` → "스텝별 챔버 압력 평균"
+7. 차트: `render_chart(df, parsed_obj)` → PNG 이미지
 
 ### 예시 3: Top N 질문
 
@@ -573,9 +767,11 @@ generate_chart(rows, parsed)
 **처리 과정**:
 1. 정규화: "group:trace_id pressact avg top5"
 2. 파싱: `Parsed(metric="avg", column="pressact", group_by="trace_id", top_n=5)`
-3. SQL: `SELECT trace_id, AVG(PressAct) as value FROM traces GROUP BY trace_id ORDER BY value DESC LIMIT 5`
-4. 결과: `[{"trace_id": "standard_trace_001", "value": 4.5}, ...]`
-5. 요약: "공정별 챔버 압력 평균 상위 5개" + 차트
+3. SQL 생성: `choose_sql()` → `build_sql()` → `SELECT trace_id, AVG(PressAct) as value FROM traces GROUP BY trace_id ORDER BY value DESC LIMIT 5`
+4. 쿼리 실행: `run_query()` → `[{"trace_id": "standard_trace_001", "value": 4.5}, ...]`
+5. 포맷팅: 각 행에 대해 `format_row()` 적용
+6. 요약: `make_summary(parsed, rows)` → "공정별 챔버 압력 평균 상위 5개"
+7. 차트: `render_chart(df, parsed_obj)` → PNG 이미지
 
 ### 예시 4: 모호성 해결
 
@@ -585,9 +781,10 @@ generate_chart(rows, parsed)
 1. 정규화: "vg11 pressact avg" (두 컬럼 모두 포함)
 2. 파싱: `Parsed(metric="avg", column="vg11")` (키 직접 매칭으로 vg11 선택)
 3. 모호성 해결: "vg11" (구체적 센서 우선)
-4. SQL: `SELECT AVG(VG11) as value FROM traces`
-5. 결과: `[{"value": 2.3}]`
-6. 요약: "진공 게이지 11 압력 평균=2.3 mTorr"
+4. SQL 생성: `choose_sql()` → `build_sql()` → `SELECT AVG(VG11) as value FROM traces`
+5. 쿼리 실행: `run_query()` → `[{"value": 2.3}]`
+6. 포맷팅: `get_format_spec("vg11")` → `(2, "mTorr")` (기본값 3 오버라이드), `format_value(2.3, "vg11", "avg")` → `"2.30 mTorr"`
+7. 요약: `make_summary(parsed, rows)` → "진공 게이지 11 압력 평균=2.30 mTorr"
 
 ---
 
@@ -603,6 +800,7 @@ vg14:
   unit: "mTorr"
   csv_columns: ["VG14"]
   aliases: ["vg14", "게이지14", "진공게이지14"]
+  # decimals: 2  # 기본값(3) 오버라이드 (선택사항)
 ```
 
 2. **모호성 해결 규칙 추가 (필요시)**:
@@ -616,6 +814,34 @@ resolution:
 ```
 
 3. **코드 변경 없음!** 자동으로 인식됩니다. ✅
+   - 포맷팅도 `defaults.decimals_by_type`의 `pressure: 3` 기본값이 자동 적용됩니다.
+
+### 컬럼 포맷팅 규칙 변경
+
+1. **기본 소수점 자리수 변경**:
+`domain/schema/columns.yaml`의 `defaults.decimals_by_type` 수정:
+```yaml
+defaults:
+  decimals_by_type:
+    pressure: 2  # 3 → 2로 변경
+```
+
+2. **특정 컬럼만 소수점 자리수 변경**:
+```yaml
+columns:
+  pressact:
+    decimals: 1  # pressure 기본값(3) 오버라이드
+```
+
+3. **단위 라벨 변경**:
+`domain/schema/columns.yaml`의 `defaults.unit_label` 수정:
+```yaml
+defaults:
+  unit_label:
+    mTorr: "mTorr"  # 또는 "밀리토르" 등으로 변경
+```
+
+4. **코드 변경 없음!** YAML만 수정하면 자동 반영됩니다. ✅
 
 ### 새 지표 추가
 
@@ -676,6 +902,10 @@ Linux 환경에서 한글 폰트가 없을 경우:
 # 폰트 설치 (예: Ubuntu)
 sudo apt-get install fonts-nanum fonts-noto-cjk
 ```
+
+폰트 설정은 `src/utils/mpl_korean.py`에서 자동으로 처리됩니다:
+- NanumGothic, NanumBarunGothic, Noto Sans CJK KR 순서로 자동 감지
+- 폰트를 찾지 못하면 DejaVu Sans 사용 (한글 깨짐 가능)
 
 ### 데이터베이스 파일이 없을 때
 

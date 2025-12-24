@@ -84,9 +84,13 @@ def compare_parsed(actual: Parsed, expected: Dict[str, Any]) -> tuple[bool, List
         expected_filters = expected_dict.get("filters", {})
         
         for key in expected_filters:
-            if actual_filters.get(key) != expected_filters.get(key):
+            actual_val = actual_filters.get(key)
+            expected_val = expected_filters[key]
+            
+            # step_names, trace_ids는 파서에서 정렬되어 반환되므로 순서 비교 가능
+            if actual_val != expected_val:
                 is_match = False
-                differences.append(f"  filters.{key}: 예상={expected_filters[key]}, 실제={actual_filters.get(key)}")
+                differences.append(f"  filters.{key}: 예상={expected_val}, 실제={actual_val}")
     
     # flags 비교
     if "flags" in expected_dict:
