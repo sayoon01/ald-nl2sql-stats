@@ -8,11 +8,13 @@ GroupBy = Optional[Literal["trace_id", "step_name", "date", "hour", "day"]]
 AnalysisType = Literal["ranking", "group_profile", "comparison", "stability"]
 
 AGG_MAP = [
+    # 변동성 키워드를 먼저 체크 (우선순위 높음)
+    (r"(변동|불안정|요동|variability|unstable)", "std"),
+    (r"(표준편차|std|stddev)", "std"),
     (r"(평균|avg|mean)", "avg"),
     (r"(최대|max)", "max"),
     (r"(최소|min)", "min"),
     (r"(개수|건수|count)", "count"),
-    (r"(표준편차|std|stddev|표준편차)", "std"),
     (r"(중앙값|median|p50|50퍼센타일)", "p50"),
     (r"(p95|95퍼센타일|95퍼센트)", "p95"),
     (r"(p99|99퍼센타일|99퍼센트)", "p99"),
@@ -27,6 +29,12 @@ COL_SYNONYMS = {
     "vg13": [r"vg13"],
     "apcvalvemon": [r"apcvalvemon", r"apc\s*밸브\s*모니터", r"apc\s*모니터"],
     "apcvalveset": [r"apcvalveset", r"apc\s*밸브\s*설정", r"apc\s*설정"],
+    # semantic_registry.yaml 기반 추가 (테스트용)
+    "mfcmon_n2_1": [r"질소\s*1", r"n2\s*1", r"n2-1", r"퍼지\s*1", r"질소\s*1\s*유량"],
+    "mfcmon_nh3": [r"암모니아\s*유량", r"nh3", r"mfcmon_nh3"],
+    "mfcmon_f_pwr": [r"rf\s*전력", r"forward\s*power", r"f\.pwr", r"f_pwr"],
+    "tempact_u": [r"상단\s*온도", r"temp\s*u", r"tempact\s*u"],
+    "tempact_l": [r"하단\s*온도", r"temp\s*l", r"tempact\s*l"],
 }
 
 TRACE_RE = re.compile(r"(standard_trace_\d{3})", re.IGNORECASE)
@@ -34,6 +42,7 @@ TRACE_RE = re.compile(r"(standard_trace_\d{3})", re.IGNORECASE)
 STEP_RE = re.compile(r"(step|스텝|단계)\s*[:=]?\s*([a-z0-9_]+)", re.IGNORECASE)
 
 TOP_RE = re.compile(r"(top\s*(\d+)|상위\s*(\d+))", re.IGNORECASE)
+BOTTOM_RE = re.compile(r"(bottom\s*(\d+)|하위\s*(\d+))", re.IGNORECASE)
 
 # 날짜 패턴: 2024-01-01, 2024/01/01
 DATE_RE = re.compile(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})")
@@ -67,12 +76,38 @@ def _pick_group_by(text: str) -> GroupBy:
         return "trace_id"
     return None
 
-def _pick_top_n(text: str) -> Optional[int]:
-    m = TOP_RE.search(text)
-    if not m:
-        return None
-    n = m.group(2) or m.group(3)
-    return int(n) if n else None
+def _pick_limit_and_order(text: str) -> tuple[Optional[int], Optional[Literal["desc", "asc"]]]:
+    """
+    LIMIT N과 ORDER BY direction 추출
+    
+    Returns:
+        (limit, order): (LIMIT N, "desc" or "asc")
+        - "상위 5개" → (5, "desc")
+        - "top 10" → (10, "desc")
+        - "하위 3개" → (3, "asc")
+        - 없으면 (None, None)
+    """
+    limit = None
+    order = None
+    
+    # 상위 N개
+    m_top = TOP_RE.search(text)
+    if m_top:
+        n = m_top.group(2) or m_top.group(3)
+        if n:
+            limit = int(n)
+            order = "desc"
+    
+    # 하위 N개 (상위보다 우선순위 낮음)
+    if limit is None:
+        m_bottom = BOTTOM_RE.search(text)
+        if m_bottom:
+            n = m_bottom.group(2) or m_bottom.group(3)
+            if n:
+                limit = int(n)
+                order = "asc"
+    
+    return limit, order
 
 def _pick_date_range(text: str) -> tuple[Optional[str], Optional[str]]:
     """날짜 범위 추출: '2024-01-01부터' 또는 '2024-01-01 ~ 2024-01-31'"""
@@ -112,7 +147,8 @@ class Parsed:
     step_name: Optional[str]  # 단일 step_name
     step_names: List[str]  # 여러 step_name 비교용
     group_by: GroupBy
-    top_n: Optional[int]
+    limit: Optional[int]  # LIMIT N (group_by가 있을 때만 의미 있음)
+    order: Optional[Literal["desc", "asc"]]  # ORDER BY direction (group_by가 있을 때만 의미 있음)
     date_start: Optional[str]  # YYYY-MM-DD
     date_end: Optional[str]  # YYYY-MM-DD
     chart_type: Optional[Literal["line", "bar", "box", "heatmap"]]  # 차트 타입 (deprecated: analysis_type 사용)
@@ -140,7 +176,37 @@ def parse_question(q: str) -> Parsed:
     step_name = step_names[0] if len(step_names) == 1 else None
 
     group_by = _pick_group_by(text)
-    top_n = _pick_top_n(text)
+    
+    limit, order = _pick_limit_and_order(text)
+    
+    # "변동/불안정/이상치 큰" 키워드 감지
+    # 패턴: "변동", "불안정", "흔들", "표준편차", "std", "분산", "variance"
+    # 또는 "이상치", "이상치 큰", "튀는", "큰 변동" 같은 조합
+    variability_patterns = [
+        r"(변동|불안정|흔들|표준편차|std|분산|variance)",
+        r"(이상치.*큰|큰.*이상치|튀는)",
+        r"(변동.*큰|큰.*변동)",
+        r"이상치",  # "이상치" 단독 키워드 추가
+    ]
+    is_variability_keyword = any(re.search(pattern, text, re.IGNORECASE) for pattern in variability_patterns)
+    
+    # 변동성/이상치 키워드가 있고 group_by가 없으면 자동으로 step_name 설정 (스텝 키워드가 있을 때)
+    if is_variability_keyword and group_by is None:
+        if re.search(r"(스텝|단계|step)", text, re.IGNORECASE):
+            group_by = "step_name"
+    
+    # 변동성/이상치 키워드가 있고 group_by가 있으면 std + desc (+ 기본 limit=10)
+    if is_variability_keyword and group_by is not None:
+        agg = "std"
+        if order is None:
+            order = "desc"  # 변동 큰 순서
+        if limit is None:
+            limit = 10  # 기본 limit=10
+    
+    # group_by가 없으면 limit/order 무시 (단일 값에 limit 걸면 의미 없음)
+    if group_by is None:
+        limit = None
+        order = None
     date_start, date_end = _pick_date_range(text)
     
     # 차트 타입 추론
@@ -158,7 +224,7 @@ def parse_question(q: str) -> Parsed:
     is_stable_avg = bool(re.search(r"(안정|안정화|stable)", text, re.IGNORECASE))
     is_overshoot = bool(re.search(r"(overshoot|오버슈트|초과)", text, re.IGNORECASE))
     is_dwell_time = bool(re.search(r"(체류|dwell|시간|time)", text, re.IGNORECASE) and group_by == "step_name")
-    is_variability = bool(re.search(r"(변동|variability|안정성)", text, re.IGNORECASE))
+    is_variability = bool(re.search(r"(변동|불안정|요동|흔들|표준편차|std|분산|variance|variability|unstable|이상치.*큰|튀는)", text, re.IGNORECASE))
     
     # 이상치 탐지 감지 (bool로 변환)
     is_outlier = bool(re.search(r"(이상치|outlier|이상)", text, re.IGNORECASE))
@@ -173,8 +239,8 @@ def parse_question(q: str) -> Parsed:
     # D. 이상치/안정성 (우선순위 2)
     elif is_outlier or is_overshoot or is_stable_avg or is_dwell_time or is_variability:
         analysis_type = "stability"
-    # A. 랭킹/비교 (top_n이 있고, group_by가 있으면 랭킹)
-    elif top_n is not None and group_by is not None:
+    # A. 랭킹/비교 (limit이 있고, group_by가 있으면 랭킹)
+    elif limit is not None and group_by is not None:
         analysis_type = "ranking"
     # B. 그룹별 분포 (하나의 trace_id 안에서 step_name별로 분석)
     elif trace_id and group_by == "step_name":
@@ -185,11 +251,11 @@ def parse_question(q: str) -> Parsed:
     else:
         analysis_type = "ranking"
     
-    # overshoot, 이상치 탐지, trace 비교는 pressact 기본값 사용
-    if (is_overshoot or is_outlier or is_trace_compare) and col is None:
+    # overshoot, 이상치 탐지, trace 비교, 변동성 분석은 pressact 기본값 사용
+    if (is_overshoot or is_outlier or is_trace_compare or (is_variability_keyword and group_by is not None)) and col is None:
         col = "pressact"
 
-    if agg != "count" and col is None and not (is_outlier or is_dwell_time or is_overshoot or is_trace_compare):
+    if agg != "count" and col is None and not (is_outlier or is_dwell_time or is_overshoot or is_trace_compare or (is_variability_keyword and group_by is not None)):
         raise ValueError("지표를 못 찾았어. 예: 'pressact 평균', '압력 최대'")
 
     return Parsed(
@@ -200,7 +266,8 @@ def parse_question(q: str) -> Parsed:
         step_name=step_name,
         step_names=step_names,
         group_by=group_by,
-        top_n=top_n,
+        limit=limit,
+        order=order,
         date_start=date_start,
         date_end=date_end,
         chart_type=chart_type,

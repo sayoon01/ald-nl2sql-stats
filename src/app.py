@@ -27,11 +27,47 @@ from src.process_metrics import (
     build_trace_compare_sql,
 )
 from src.chart_templates import get_chart_template, apply_chart_template
+from src.payload_builder import build_payload
+from src.plot_generator import plot_timeseries
+from src.question_suggestions import get_suggestions, get_category_suggestions, get_popular_questions
 
-DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+# 프로젝트 루트 기준 경로
+PROJECT_ROOT = Path(__file__).parent.parent
+DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 app = FastAPI(title="ALD NL→SQL Stats API")
-templates = Jinja2Templates(directory=str(Path.home() / "ald_app" / "templates"))
+templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
+
+def validate_database():
+    """데이터베이스 무결성 검증: trace_id가 비어있으면 에러"""
+    if not DB.exists():
+        raise FileNotFoundError(f"데이터베이스가 없습니다: {DB}\n해결책: python -m src.preprocess_duckdb 실행 필요")
+    
+    con = duckdb.connect(str(DB))
+    try:
+        null_count = con.execute("""
+            SELECT COUNT(*) 
+            FROM traces_dedup 
+            WHERE trace_id IS NULL OR trace_id = ''
+        """).fetchone()[0]
+        
+        if null_count > 0:
+            total = con.execute("SELECT COUNT(*) FROM traces_dedup").fetchone()[0]
+            raise ValueError(
+                f"데이터 무결성 오류: trace_id가 비어있는 행이 {null_count:,}개 ({null_count/total*100:.1f}%) 있습니다.\n"
+                f"해결책: python -m src.preprocess_duckdb 실행하여 데이터베이스를 재생성하세요."
+            )
+    finally:
+        con.close()
+
+# 앱 시작 시 검증
+@app.on_event("startup")
+async def startup_event():
+    try:
+        validate_database()
+    except (FileNotFoundError, ValueError) as e:
+        print(f"⚠️  경고: {e}")
+        # 에러를 출력하지만 앱은 계속 실행 (개발 편의를 위해)
 
 class QueryIn(BaseModel):
     question: str
@@ -94,39 +130,16 @@ def format_row(row: dict, parsed: dict) -> dict:
     return formatted
 
 def make_summary(parsed: dict, rows: list) -> str:
-    agg_kr_map = {
-        "avg": "평균", "min": "최소", "max": "최대", "count": "개수",
-        "std": "표준편차", "stddev": "표준편차", "p50": "중앙값", "median": "중앙값",
-        "p95": "95퍼센타일", "p99": "99퍼센타일", "null_ratio": "결측률"
-    }
-    agg_kr = agg_kr_map.get(parsed["agg"], parsed["agg"])
-    col = parsed.get("col") or "*"
-    scope = []
-    if parsed.get("trace_id"):
-        scope.append(parsed["trace_id"])
-    if parsed.get("step_name"):
-        scope.append(f"step={parsed['step_name']}")
-    scope_txt = (", ".join(scope) + " 기준 ") if scope else ""
-
-    if not rows:
-        return f"결과가 없습니다. ({scope_txt}{col} {agg_kr})"
-
-    if parsed.get("group_by"):
-        top = rows[0]
-        key = parsed["group_by"]
-        key_kr = "공정 ID" if key == "trace_id" else ("단계명" if key == "step_name" else key)
-        summary = f"{scope_txt}{col} {agg_kr} ({key_kr}별 Top {len(rows)}). 1위={top.get(key)}: {top.get('value')}"
-        
-        # 추가 통계 정보 (n, std, min, max)가 있으면 표시
-        if "n" in top:
-            summary += f" (n={top['n']})"
-        if "std" in top and top.get("std"):
-            summary += f" [std={top['std']}]"
-        if "min_val" in top and "max_val" in top:
-            summary += f" [범위: {top['min_val']} ~ {top['max_val']}]"
-        return summary
+    """
+    결과 요약 생성 (해석 레이어 사용)
     
-    # trace 비교 케이스
+    특수 케이스(trace 비교, 이상치 등)는 기존 로직 유지,
+    일반 케이스는 interpreter 사용하여 사람이 읽기 쉬운 문장으로 변환
+    """
+    from src.interpreter import interpret
+    from src.nl_parse import Parsed
+    
+    # 특수 케이스: trace 비교
     if parsed.get("is_trace_compare") and rows:
         top = rows[0]
         trace_ids = parsed.get("trace_ids", [])
@@ -136,12 +149,10 @@ def make_summary(parsed: dict, rows: list) -> str:
             trace1_avg = top.get('trace1_avg', 0)
             trace2_avg = top.get('trace2_avg', 0)
             
-            # 해석 추가
             diff_str = f"{diff_val:.1f}" if isinstance(diff_val, (int, float)) else str(diff_val)
             trace1_str = f"{trace_ids[0]}"
             trace2_str = f"{trace_ids[1]}"
             
-            # 해석 텍스트 생성
             interpretation = ""
             if step_name == "STANDBY":
                 interpretation = "이는 대기 단계에서 진공 안정화 또는 배기 제어 차이가 있었을 가능성을 시사합니다."
@@ -152,33 +163,71 @@ def make_summary(parsed: dict, rows: list) -> str:
             else:
                 interpretation = "이는 해당 단계에서 공정 조건 또는 제어 파라미터 차이가 있었을 가능성을 시사합니다."
             
-            summary = f"{step_name} 단계에서 trace 간 pressact 차이가 가장 큽니다 (차이: ≈{diff_str} mTorr, {trace1_str}: {trace1_avg:.1f} mTorr, {trace2_str}: {trace2_avg:.1f} mTorr). {interpretation}"
-            return summary
+            return f"{step_name} 단계에서 trace 간 pressact 차이가 가장 큽니다 (차이: ≈{diff_str} mTorr, {trace1_str}: {trace1_avg:.1f} mTorr, {trace2_str}: {trace2_avg:.1f} mTorr). {interpretation}"
     
-    # 이상치 탐지 케이스
+    # 특수 케이스: 이상치 탐지
     if parsed.get("is_outlier"):
         if not rows:
             return "이상치가 발견되지 않았습니다. (z-score > 1.0 기준)"
         top = rows[0]
-        summary = f"이상치 비율 Top {len(rows)}. 1위 trace={top.get('trace_id')}: {top.get('value')}% (n={top.get('n')}, 이상치={top.get('outlier_count')})"
-        return summary
-
-    r0 = rows[0]
-    if "value" in r0:
-        summary = f"{scope_txt}{col} {agg_kr}={r0['value']}"
-        if "n" in r0:
-            summary += f" (n={r0['n']})"
-        if "std" in r0 and r0.get("std"):
-            summary += f" [std={r0['std']}]"
-        return summary
-    if "n" in r0:
-        return f"{scope_txt}{col} {agg_kr}={r0['n']}"
-    return "요약 생성 실패"
+        return f"이상치 비율 Top {len(rows)}. 1위 trace={top.get('trace_id')}: {top.get('value')}% (표본 {top.get('n')}개, 이상치 {top.get('outlier_count')}개)"
+    
+    # 일반 케이스: 해석 레이어 사용
+    if not rows:
+        from src.interpreter import LABEL, AGG_LABEL
+        name = LABEL.get(parsed.get("col"), parsed.get("col")) if parsed.get("col") else "값"
+        agg_kor = AGG_LABEL.get(parsed.get("agg"), parsed.get("agg", "결과"))
+        return f"{name} {agg_kor} 결과가 없습니다."
+    
+    # rows를 DataFrame으로 변환
+    try:
+        df = pd.DataFrame(rows)
+        # Parsed 객체 생성 (dict에서)
+        parsed_obj = Parsed(
+            agg=parsed.get("agg", "avg"),
+            col=parsed.get("col"),
+            trace_id=parsed.get("trace_id"),
+            trace_ids=parsed.get("trace_ids", []),
+            step_name=parsed.get("step_name"),
+            step_names=parsed.get("step_names", []),
+            group_by=parsed.get("group_by"),
+            limit=parsed.get("limit"),
+            order=parsed.get("order"),
+            date_start=parsed.get("date_start"),
+            date_end=parsed.get("date_end"),
+            chart_type=parsed.get("chart_type"),
+            analysis_type=parsed.get("analysis_type", "ranking"),
+            is_stable_avg=parsed.get("is_stable_avg", False),
+            is_overshoot=parsed.get("is_overshoot", False),
+            is_dwell_time=parsed.get("is_dwell_time", False),
+            is_variability=parsed.get("is_variability", False),
+            is_outlier=parsed.get("is_outlier", False),
+            is_trace_compare=parsed.get("is_trace_compare", False),
+        )
+        return interpret(parsed_obj, df, topn=5)
+    except Exception as e:
+        # 폴백: 기존 방식 (디버깅용)
+        agg_kr_map = {
+            "avg": "평균", "min": "최소", "max": "최대", "count": "개수",
+            "std": "표준편차", "stddev": "표준편차"
+        }
+        agg_kr = agg_kr_map.get(parsed.get("agg"), parsed.get("agg", ""))
+        col = parsed.get("col") or "*"
+        r0 = rows[0] if rows else {}
+        if "value" in r0:
+            return f"{col} {agg_kr}={r0.get('value')} (표본 {r0.get('n', 0)}개)"
+        return f"요약 생성 실패: {str(e)}"
 
 @app.post("/query")
 def query(q: QueryIn):
+    """표준 payload 반환: question, summary, sql, columns, data, meta"""
     try:
-        parsed_obj = parse_question(q.question)
+        con = duckdb.connect(str(DB))
+        try:
+            payload = build_payload(q.question, con)
+            return payload
+        finally:
+            con.close()
     except Exception as e:
         return {
             "ok": False,
@@ -193,42 +242,6 @@ def query(q: QueryIn):
             ],
         }
 
-    # 공정 친화 지표 또는 이상치 탐지 처리
-    if parsed_obj.is_trace_compare:
-        sql, params = build_trace_compare_sql(parsed_obj)
-    elif parsed_obj.is_outlier:
-        sql, params = build_outlier_detection_sql(parsed_obj)
-    elif parsed_obj.is_dwell_time:
-        sql, params = build_dwell_time_sql(parsed_obj)
-    elif parsed_obj.is_overshoot:
-        sql, params = build_overshoot_sql(parsed_obj)
-    elif parsed_obj.is_stable_avg:
-        sql, params = build_stable_avg_sql(parsed_obj)
-    else:
-        sql, params = build_sql(parsed_obj)
-
-    con = duckdb.connect(str(DB))
-    try:
-        df = con.execute(sql, params).df()
-        rows_raw = df.to_dict(orient="records")
-        parsed = parsed_obj.__dict__
-        # 포맷팅 적용
-        rows = [format_row(row, parsed) for row in rows_raw]
-    finally:
-        con.close()
-    
-    parsed = parsed_obj.__dict__
-    summary = make_summary(parsed, rows_raw)  # summary는 원본 값 사용
-
-    return {
-        "ok": True,
-        "question": q.question,
-        "parsed": parsed,
-        "sql": sql.strip(),
-        "rows": rows,
-        "summary": summary,
-    }
-
 # ✅ HTML 테이블 UI
 @app.get("/view", response_class=HTMLResponse)
 def view(request: Request, q: str | None = None, show_all: str | None = None):
@@ -238,11 +251,12 @@ def view(request: Request, q: str | None = None, show_all: str | None = None):
     try:
         parsed_obj = parse_question(q)
         
-        # 스텝별 쿼리는 기본값 top10 적용 (명시적으로 지정하지 않은 경우)
+        # 스텝별 쿼리는 기본값 limit=10 적용 (명시적으로 지정하지 않은 경우)
         # show_all=1이면 전체 보기
-        if parsed_obj.group_by == "step_name" and parsed_obj.top_n is None:
+        if parsed_obj.group_by == "step_name" and parsed_obj.limit is None:
             if show_all != "1":
-                parsed_obj.top_n = 10
+                parsed_obj.limit = 10
+                parsed_obj.order = "desc"
                 show_all_button = True
                 add_others = True  # Others 그룹 추가
             else:
@@ -270,8 +284,8 @@ def view(request: Request, q: str | None = None, show_all: str | None = None):
         try:
             df = con.execute(sql, params).df()
             
-            # Others 그룹 추가 (스텝별이고 top_n이 있을 때)
-            if add_others and parsed_obj.group_by == "step_name" and parsed_obj.top_n:
+            # Others 그룹 추가 (스텝별이고 limit이 있을 때)
+            if add_others and parsed_obj.group_by == "step_name" and parsed_obj.limit:
                 # y_col 먼저 찾기
                 y_col_temp = "value" if "value" in df.columns else ("n" if "n" in df.columns else df.columns[-1])
                 x_col_temp = df.columns[0]
@@ -330,9 +344,9 @@ def view(request: Request, q: str | None = None, show_all: str | None = None):
     except Exception as e:
         return templates.TemplateResponse("index.html", {"request": request, "q": q, "error": str(e)})
 
-# ✅ PNG plot (브라우저에서 바로 열리는 엔드포인트)
+# ✅ PNG plot (브라우저에서 바로 열리는 엔드포인트) - 레거시 (하위 호환성)
 @app.get("/plot")
-def plot(q: str):
+def plot_legacy(q: str):
     try:
         parsed_obj = parse_question(q)
         
@@ -383,10 +397,11 @@ def plot(q: str):
         df_all_for_others = None
         if parsed_obj.analysis_type == "group_profile" and parsed_obj.group_by == "step_name" and len(df) > 12:
             # 요약 모드로 전환: Top 7 + Others
-            if not parsed_obj.top_n:  # 사용자가 명시하지 않았으면
+            if not parsed_obj.limit:  # 사용자가 명시하지 않았으면
                 config = get_chart_template("ranking")  # ranking 스타일로 전환
                 config["chart_type"] = "horizontal_bar"  # 가로 막대로
-                parsed_obj.top_n = 7  # Top 7만 표시
+                parsed_obj.limit = 7  # Top 7만 표시
+                parsed_obj.order = "desc"
                 add_others_for_chart = True  # Others 추가 플래그
                 # 나머지는 Others로 묶기 위해 원본 저장 (값 기준 정렬 필요)
                 df_all_for_others = df.copy()
@@ -394,8 +409,8 @@ def plot(q: str):
                 df = df.sort_values(y_col, ascending=False).head(7) if len(df) > 7 else df.sort_values(y_col, ascending=False)
         
         # 템플릿 설정에 따라 데이터 처리
-        if config["use_top_n"] and parsed_obj.top_n and len(df) > parsed_obj.top_n:
-            df = df.head(parsed_obj.top_n)
+        if config["use_top_n"] and parsed_obj.limit and len(df) > parsed_obj.limit:
+            df = df.head(parsed_obj.limit)
         elif len(df) > 100:
             df = df.head(100)  # 최대 100개
         
@@ -526,28 +541,155 @@ def get_columns():
 @app.get("/api/traces")
 def get_traces():
     con = duckdb.connect(str(DB))
-    df = con.execute("SELECT DISTINCT trace_id FROM traces ORDER BY trace_id").df()
+    df = con.execute("SELECT DISTINCT trace_id FROM traces_dedup ORDER BY trace_id").df()
     return {"traces": df['trace_id'].tolist()}
 
 # ✅ 데이터 탐색: 단계명 목록
 @app.get("/api/steps")
 def get_steps():
     con = duckdb.connect(str(DB))
-    df = con.execute("SELECT DISTINCT step_name FROM traces ORDER BY step_name").df()
+    df = con.execute("SELECT DISTINCT step_name FROM traces_dedup ORDER BY step_name").df()
     return {"steps": df['step_name'].tolist()}
+
+# ✅ CSV 다운로드
+@app.get("/api/csv")
+def download_csv(q: str):
+    try:
+        parsed_obj = parse_question(q)
+        
+        if parsed_obj.is_trace_compare:
+            sql, params = build_trace_compare_sql(parsed_obj)
+        elif parsed_obj.is_overshoot:
+            sql, params = build_overshoot_sql(parsed_obj)
+        elif parsed_obj.is_outlier:
+            sql, params = build_outlier_detection_sql(parsed_obj)
+        elif parsed_obj.is_dwell_time:
+            sql, params = build_dwell_time_sql(parsed_obj)
+        elif parsed_obj.is_stable_avg:
+            sql, params = build_stable_avg_sql(parsed_obj)
+        else:
+            sql, params = build_sql(parsed_obj)
+        
+        con = duckdb.connect(str(DB))
+        try:
+            df = con.execute(sql, params).df()
+        finally:
+            con.close()
+        
+        csv_content = df.to_csv(index=False)
+        
+        return Response(
+            content=csv_content.encode("utf-8-sig"),  # BOM 포함 (Excel 호환)
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="query_result_{q[:20]}.csv"'}
+        )
+    except Exception as e:
+        return Response(content=f"오류: {str(e)}".encode("utf-8"), media_type="text/plain")
 
 # ✅ 데이터 탐색: 데이터 범위
 @app.get("/api/range")
 def get_data_range():
     con = duckdb.connect(str(DB))
-    min_date = con.execute("SELECT MIN(DATE(timestamp)) as min_date FROM traces").fetchone()[0]
-    max_date = con.execute("SELECT MAX(DATE(timestamp)) as max_date FROM traces").fetchone()[0]
-    total_rows = con.execute("SELECT COUNT(*) as cnt FROM traces").fetchone()[0]
+    min_date = con.execute("SELECT MIN(DATE(timestamp)) as min_date FROM traces_dedup").fetchone()[0]
+    max_date = con.execute("SELECT MAX(DATE(timestamp)) as max_date FROM traces_dedup").fetchone()[0]
+    total_rows = con.execute("SELECT COUNT(*) as cnt FROM traces_dedup").fetchone()[0]
     return {
         "min_date": str(min_date) if min_date else None,
         "max_date": str(max_date) if max_date else None,
         "total_rows": total_rows
     }
+
+@app.get("/api/query")
+def query_get(q: str):
+    """GET 방식: 표준 payload 반환: question, summary, sql, columns, data, meta"""
+    try:
+        con = duckdb.connect(str(DB))
+        try:
+            payload = build_payload(q, con)
+            return payload
+        finally:
+            con.close()
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": str(e),
+            "hint_examples": get_popular_questions(5),
+        }
+
+@app.get("/api/suggestions")
+def get_question_suggestions(q: str = "", category: str = None, limit: int = 10):
+    """
+    질문 추천 및 자동완성
+    
+    Args:
+        q: 검색어 (부분 매칭)
+        category: 카테고리 필터
+        limit: 반환할 최대 개수
+    """
+    if category:
+        questions = get_category_suggestions(category)
+        return {
+            "suggestions": [{"question": q, "category": category} for q in questions[:limit]]
+        }
+    
+    suggestions = get_suggestions(q, limit)
+    return {"suggestions": suggestions}
+
+@app.get("/api/popular")
+def get_popular():
+    """인기 질문 목록"""
+    return {"questions": get_popular_questions(10)}
+
+@app.get("/api/plot")
+def plot_api(q: str):
+    """시계열 Plot API: Matplotlib PNG 반환"""
+    from urllib.parse import unquote
+    
+    try:
+        q_decoded = unquote(q)
+        p = parse_question(q_decoded)
+        
+        # SQL 생성
+        if p.is_trace_compare:
+            sql, params = build_trace_compare_sql(p)
+        elif p.is_overshoot:
+            sql, params = build_overshoot_sql(p)
+        elif p.is_outlier:
+            sql, params = build_outlier_detection_sql(p)
+        elif p.is_dwell_time:
+            sql, params = build_dwell_time_sql(p)
+        elif p.is_stable_avg:
+            sql, params = build_stable_avg_sql(p)
+        else:
+            sql, params = build_sql(p)
+        
+        con = duckdb.connect(str(DB))
+        try:
+            df = con.execute(sql, params).df()
+        finally:
+            con.close()
+        
+        # 시계열 Plot 생성
+        from src.semantic_resolver import get_metadata_by_physical_column
+        metadata = get_metadata_by_physical_column(p.col) if p.col else None
+        unit = metadata.get("unit", "") if metadata else ""
+        
+        title = q_decoded
+        x_col = "timestamp" if "timestamp" in df.columns else (df.columns[0] if not df.empty else "timestamp")
+        y_col = "value" if "value" in df.columns else (df.columns[-1] if not df.empty else "value")
+        
+        buf = plot_timeseries(df, title=title, x_col=x_col, y_col=y_col, unit=unit)
+        
+        return Response(buf.read(), media_type="image/png")
+    except Exception as e:
+        # 에러 이미지 반환
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.text(0.5, 0.5, f"오류: {str(e)}", ha='center', va='center', transform=ax.transAxes, color='red')
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+        plt.close(fig)
+        return Response(buf.read(), media_type="image/png")
 
 # ✅ CSV 다운로드
 @app.get("/api/csv")
@@ -579,7 +721,7 @@ def download_csv(q: str):
         return {"ok": False, "error": str(e)}
 
 # ✅ 히스토리 저장/조회 (간단한 JSON 파일 기반)
-HISTORY_FILE = Path.home() / "ald_app" / "data" / "history.json"
+HISTORY_FILE = PROJECT_ROOT / "data" / "history.json"
 
 @app.post("/api/history")
 def save_history(q: QueryIn):
@@ -616,7 +758,7 @@ def get_history():
         return {"ok": False, "error": str(e)}
 
 # ✅ 즐겨찾기 저장/조회
-FAVORITES_FILE = Path.home() / "ald_app" / "data" / "favorites.json"
+FAVORITES_FILE = PROJECT_ROOT / "data" / "favorites.json"
 
 @app.post("/api/favorites")
 def save_favorite(q: QueryIn):

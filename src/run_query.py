@@ -10,7 +10,9 @@ from src.process_metrics import (
     build_trace_compare_sql,
 )
 
-DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+# 프로젝트 루트 기준 경로
+PROJECT_ROOT = Path(__file__).parent.parent
+DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def main():
     q = input("질문: ").strip()

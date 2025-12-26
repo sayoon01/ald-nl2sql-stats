@@ -3,84 +3,107 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ALD NL→SQL</title>
+  <title>ALD 공정 데이터 분석</title>
   <style>
     * { box-sizing: border-box; }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
       margin: 0; 
       padding: 24px;
-      background: #1a1a2e;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
-      color: #e0e0e0;
+      color: #333;
     }
     .container {
       max-width: 1200px;
       margin: 0 auto;
-      background: #16213e;
-      border-radius: 16px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-      padding: 32px;
-      border: 1px solid #2a2a3e;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      border: 1px solid rgba(255,255,255,0.2);
     }
-    h2 {
-      margin: 0 0 24px 0;
-      color: #fff;
-      font-size: 28px;
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 30px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    .header h1 {
+      margin: 0 0 12px 0;
+      color: #2d3748;
+      font-size: 36px;
       font-weight: 700;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header p {
+      margin: 0;
+      color: #718096;
+      font-size: 16px;
     }
     .form-group {
       display: flex;
       gap: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 32px;
     }
     input[type=text] { 
       flex: 1;
-      padding: 14px 16px; 
+      padding: 16px 20px; 
       font-size: 16px;
-      border: 2px solid #2a2a3e;
-      border-radius: 8px;
-      background: #0f1624;
-      color: #e0e0e0;
-      transition: border-color 0.3s;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      background: #f7fafc;
+      color: #2d3748;
+      transition: all 0.3s;
     }
     input[type=text]:focus {
       outline: none;
-      border-color: #4a5d7e;
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
     input[type=text]::placeholder {
-      color: #6a6a7e;
+      color: #a0aec0;
     }
     button { 
-      padding: 14px 28px; 
+      padding: 16px 32px; 
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      background: #2d3748;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      border: 1px solid #4a5568;
-      border-radius: 8px;
-      transition: all 0.2s;
+      border: none;
+      border-radius: 12px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
     }
     button:hover {
-      background: #4a5568;
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(74, 85, 104, 0.4);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     }
     button:active {
       transform: translateY(0);
     }
     .box { 
       margin-top: 24px; 
-      padding: 20px; 
-      border: 1px solid #2a2a3e; 
-      border-radius: 12px;
-      background: #0f1624;
+      padding: 24px; 
+      border: 1px solid #e2e8f0; 
+      border-radius: 16px;
+      background: #f7fafc;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+    }
+    .box:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
     .box h3 {
-      margin: 0 0 12px 0;
-      color: #fff;
-      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #2d3748;
+      font-size: 20px;
+      font-weight: 600;
     }
     .examples {
       margin: 16px 0;
@@ -91,125 +114,309 @@
       margin: 0;
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
     }
     .examples li {
       display: inline-block;
     }
-    code { 
-      background: #1a1a2e; 
-      padding: 6px 12px; 
-      border-radius: 6px;
-      font-family: 'Monaco', 'Courier New', monospace;
+    .example-btn {
+      display: inline-block;
+      padding: 10px 18px;
+      background: white;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      color: #4a5568;
+      text-decoration: none;
       font-size: 14px;
-      color: #7c9ed9;
-      border: 1px solid #2a2a3e;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    .example-btn:hover {
+      border-color: #667eea;
+      color: #667eea;
+      background: #f7faff;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
     }
     .error-box {
-      background: #2d1b1b;
-      border-color: #4a2a2a;
-      color: #ff6b6b;
+      background: #fed7d7;
+      border-color: #fc8181;
+      color: #c53030;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 24px;
     }
     table { 
       border-collapse: collapse; 
       margin-top: 16px; 
       width: 100%;
-      background: #16213e;
-      border-radius: 8px;
+      background: white;
+      border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     th, td { 
-      border: 1px solid #2a2a3e; 
-      padding: 12px 16px; 
+      border: 1px solid #e2e8f0; 
+      padding: 14px 18px; 
       font-size: 14px; 
       text-align: left;
     }
     th { 
-      background: #2d3748;
-      color: #fff;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
       font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
     }
     td {
-      color: #e0e0e0;
+      color: #2d3748;
     }
     tr:nth-child(even) {
-      background: #1a2332;
+      background: #f7fafc;
     }
     tr:hover {
-      background: #253447;
+      background: #edf2f7;
     }
-    .summary {
-      font-size: 16px;
-      color: #e0e0e0;
-      margin-bottom: 12px;
-      padding: 12px;
-      background: #1a2332;
-      border-left: 4px solid #4a5d7e;
-      border-radius: 4px;
+    .summary-box {
+      background: linear-gradient(135deg, #f0f4ff 0%, #e6edff 100%);
+      border: 2px solid #667eea;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+    }
+    .summary-box:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.25);
+    }
+    .summary-box h3 {
+      margin: 0 0 16px 0;
+      color: #2d3748;
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .summary-box .summary-text {
+      font-size: 18px;
+      line-height: 1.8;
+      color: #2d3748;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .summary-box .tip {
+      margin-top: 16px;
+      padding: 14px;
+      background: rgba(102, 126, 234, 0.1);
+      border-left: 4px solid #667eea;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #4a5568;
     }
     .meta {
       margin-top: 12px;
       font-size: 13px;
-      color: #a0a0b0;
+      color: #718096;
     }
     .meta code {
-      background: #1a1a2e;
+      background: #edf2f7;
       padding: 4px 8px;
       font-size: 12px;
+      border-radius: 4px;
+      color: #2d3748;
     }
     .plot-container {
-      margin-top: 16px;
-      padding: 20px;
-      background: #0f1624;
-      border-radius: 8px;
-      border: 1px solid #2a2a3e;
+      margin-top: 24px;
+      padding: 24px;
+      background: white;
+      border-radius: 16px;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     .plot-container img {
       max-width: 100%;
       height: auto;
-      border-radius: 8px;
+      border-radius: 12px;
       display: block;
-      margin: 16px auto 0 auto;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      margin: 20px auto 0 auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
-    .plot-links {
-      margin-top: 16px;
-      padding: 16px;
-      background: #0f1624;
-      border-radius: 8px;
-      border: 1px solid #2a2a3e;
-      display: flex;
-      gap: 12px;
-      align-items: center;
+    .chart-guide {
+      margin-bottom: 20px;
+      padding: 20px;
+      background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+      border-radius: 12px;
+      border-left: 4px solid #fc8181;
     }
-    .plot-links a {
-      display: inline-block;
-      padding: 10px 20px;
-      background: #2d3748;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: 500;
-      border: 1px solid #4a5568;
-      transition: all 0.2s;
+    .chart-guide h4 {
+      margin: 0 0 12px 0;
+      color: #2d3748;
+      font-size: 16px;
+      font-weight: 600;
     }
-    .plot-links a:hover {
-      background: #4a5568;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(74, 85, 104, 0.4);
+    .chart-guide ul {
+      margin: 0;
+      padding-left: 20px;
+      color: #4a5568;
+      line-height: 1.8;
+    }
+    .chart-guide li {
+      margin-bottom: 8px;
     }
     .no-results {
       margin-top: 16px;
+      padding: 24px;
+      background: #fffaf0;
+      border-radius: 12px;
+      color: #c05621;
+      border-left: 4px solid #f6ad55;
+      text-align: center;
+    }
+    .filter-section {
+      margin-bottom: 16px;
       padding: 16px;
-      background: #2d2d1b;
+      background: white;
+      border-radius: 12px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .filter-section input,
+    .filter-section select {
+      padding: 10px 14px;
+      border: 2px solid #e2e8f0;
       border-radius: 8px;
-      color: #ffd93d;
-      border-left: 4px solid #ffd93d;
+      background: white;
+      color: #2d3748;
+      font-size: 14px;
+    }
+    .filter-section input:focus,
+    .filter-section select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .btn-secondary {
+      padding: 10px 20px;
+      background: white;
+      color: #667eea;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      display: inline-block;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: #667eea;
+      color: white;
+    }
+    .help-section {
+      background: #f0f4ff;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      border-left: 4px solid #667eea;
+    }
+    .help-section h4 {
+      margin: 0 0 12px 0;
+      color: #2d3748;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .help-section p {
+      margin: 0;
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    details {
+      margin-top: 16px;
+    }
+    details summary {
+      cursor: pointer;
+      color: #667eea;
+      font-weight: 500;
+      padding: 12px;
+      background: #f7fafc;
+      border-radius: 8px;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    details summary:hover {
+      background: #edf2f7;
+    }
+    details[open] summary {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    .meta-content {
+      margin-top: 0;
+      padding: 16px;
+      background: #f7fafc;
+      border-radius: 0 0 8px 8px;
+      border-top: 1px solid #e2e8f0;
     }
   </style>
   <script>
-    // 필터 및 정렬 기능
+    // 질문 입력 필드 자동완성 및 추천
     document.addEventListener('DOMContentLoaded', function() {
+      const queryInput = document.getElementById('questionInput');
+      if (queryInput) {
+        // 추천 목록 표시
+        function showSuggestions(query) {
+          if (!query || query.length < 1) {
+            // 입력이 없으면 인기 질문 표시
+            fetch('/api/popular')
+              .then(r => r.json())
+              .then(data => {
+                updateSuggestionList(data.questions || []);
+              })
+              .catch(err => console.error('추천 로드 실패:', err));
+            return;
+          }
+          
+          // 검색어 기반 추천
+          fetch(`/api/suggestions?q=${encodeURIComponent(query)}&limit=8`)
+            .then(r => r.json())
+            .then(data => {
+              const questions = (data.suggestions || []).map(s => s.question || s);
+              updateSuggestionList(questions);
+            })
+            .catch(err => console.error('추천 로드 실패:', err));
+        }
+        
+        // 추천 목록 업데이트
+        function updateSuggestionList(questions) {
+          const listEl = document.getElementById('suggestionList');
+          if (!listEl) return;
+          
+          listEl.innerHTML = questions.map(q => 
+            `<li><a href="/view?q=${encodeURIComponent(q)}" class="example-btn">${q}</a></li>`
+          ).join('');
+        }
+        
+        // 입력 이벤트 (디바운싱)
+        let debounceTimer;
+        queryInput.addEventListener('input', function(e) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            showSuggestions(e.target.value);
+          }, 300);
+        });
+        
+        // 초기 추천 로드
+        showSuggestions('');
+      }
+      
+      // 필터 및 정렬 기능
       const filterInput = document.getElementById('stepFilter');
       const sortSelect = document.getElementById('sortBy');
       const tableBody = document.getElementById('tableBody');
@@ -251,136 +458,164 @@
         visibleRows.forEach(row => tableBody.appendChild(row));
       }
       
-      filterInput.addEventListener('input', filterAndSort);
-      sortSelect.addEventListener('change', filterAndSort);
+      if (filterInput) filterInput.addEventListener('input', filterAndSort);
+      if (sortSelect) sortSelect.addEventListener('change', filterAndSort);
     });
   </script>
 </head>
 <body>
   <div class="container">
-    <h2>ALD 자연어 → SQL 기본통계</h2>
+    <div class="header">
+      <h1>🎯 ALD 공정 데이터 분석</h1>
+      <p>자연어로 질문하면 공정 데이터를 분석해드립니다</p>
+    </div>
 
-    <form method="get" action="/view">
+    <form method="get" action="/view" id="queryForm">
       <div class="form-group">
-        <input type="text" name="q" value="{{ q|default('') }}" placeholder="예: 공정별 pressact 평균 top5" />
-        <button type="submit">실행</button>
+        <input 
+          type="text" 
+          name="q" 
+          value="{{ q|default('') }}" 
+          placeholder="💡 질문 예시: '압력 평균', '스텝별 압력 평균', '변동 큰 스텝' 등" 
+          autocomplete="off"
+          id="questionInput"
+        />
+        <button type="submit">🔍 분석하기</button>
+      </div>
+      <div style="margin-top: 8px; font-size: 13px; color: #718096; padding-left: 4px;">
+        자연어로 질문하세요. 예: "압력이 높은 스텝은?", "온도 평균은?", "변동이 큰 단계는?"
       </div>
     </form>
 
-    <div class="box">
-      <h3>예시 질문</h3>
-      <div class="examples">
-        <ul>
-          <li><code>공정별 pressact 평균 top5</code></li>
-          <li><code>스텝별 pressact 평균</code> <small style="color: #b0b0c0;">(n/std/min/max 포함)</small></li>
-          <li><code>pressact overshoot top10</code> <small style="color: #b0b0c0;">(오버슈트 큰 step)</small></li>
-          <li><code>pressact 이상치 top5</code> <small style="color: #b0b0c0;">(이상치 비율 큰 trace)</small></li>
-          <li><code>standard_trace_001과 standard_trace_002 pressact 비교</code> <small style="color: #b0b0c0;">(차이 큰 step top5)</small></li>
+    {% if not q or not parsed %}
+      <div class="help-section">
+        <h4>💡 어떻게 사용하나요?</h4>
+        <p>자연어로 질문하면 자동으로 데이터를 분석해드립니다. 아래와 같은 형태로 질문하실 수 있습니다:</p>
+        <ul style="margin: 12px 0 0 0; padding-left: 20px; color: #4a5568; line-height: 1.8;">
+          <li><strong>단일값:</strong> "압력 평균", "온도 최대", "rf 전력 표준편차"</li>
+          <li><strong>그룹별:</strong> "스텝별 압력 평균", "공정별 온도 평균 상위 5개"</li>
+          <li><strong>변동성:</strong> "변동 큰 스텝", "압력 이상치 상위 10개"</li>
+          <li><strong>비교:</strong> "standard_trace_001과 standard_trace_002 압력 비교"</li>
         </ul>
+      </div>
+    {% endif %}
+
+    <div class="box">
+      <h3>📝 질문 추천</h3>
+      <div class="examples">
+        <ul id="suggestionList">
+          <li><a href="/view?q=압력 평균" class="example-btn">압력 평균</a></li>
+          <li><a href="/view?q=스텝별 압력 평균" class="example-btn">스텝별 압력 평균</a></li>
+          <li><a href="/view?q=변동 큰 스텝" class="example-btn">변동 큰 스텝</a></li>
+          <li><a href="/view?q=압력 이상치 상위 10개" class="example-btn">압력 이상치 찾기</a></li>
+          <li><a href="/view?q=standard_trace_001과 standard_trace_002 압력 비교" class="example-btn">공정 간 비교</a></li>
+        </ul>
+      </div>
+      <div style="margin-top: 12px; font-size: 13px; color: #718096;">
+        💡 위 추천 질문을 클릭하거나 직접 질문을 입력하세요
       </div>
     </div>
 
     {% if error %}
-      <div class="box error-box">
-        <h3>에러</h3>
+      <div class="error-box">
+        <h3 style="margin-top: 0;">⚠️ 오류가 발생했습니다</h3>
         <div>{{ error }}</div>
+        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(197,48,48,0.3);">
+          <strong>도움이 필요하신가요?</strong>
+          <p style="margin: 8px 0 0 0; font-size: 14px;">위의 예시 질문을 클릭해서 시도해보세요.</p>
+        </div>
       </div>
     {% endif %}
 
     {% if parsed %}
-      <div class="box">
-        <div class="summary">
-          <div style="font-size: 18px; margin-bottom: 8px;">
-            <strong>📊 결과 요약</strong>
-          </div>
-          <div style="font-size: 16px; line-height: 1.6;">
-            {{ summary }}
-          </div>
-          {% if parsed.group_by %}
-            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2a3e; font-size: 14px; color: #b0b0c0;">
-              💡 <strong>팁:</strong> 아래 차트에서 각 {{ "단계" if parsed.group_by == "step_name" else "공정" }}별 값을 시각적으로 비교할 수 있습니다.
-            </div>
-          {% endif %}
+      <div class="summary-box">
+        <h3>📊 분석 결과</h3>
+        <div class="summary-text">
+          {{ summary }}
         </div>
-        
-        <details style="margin-top: 16px;">
-          <summary style="cursor: pointer; color: #7c9ed9; font-weight: 500; padding: 8px; background: #1a2332; border-radius: 6px; user-select: none;">
-            🔍 상세 정보 보기/숨기기
-          </summary>
-          <div class="meta" style="margin-top: 12px; padding: 12px; background: #1a1a2e; border-radius: 8px;">
-            <div style="margin-bottom: 12px;">
-              <strong style="color: #fff;">분석 파라미터:</strong>
-              <pre style="margin: 8px 0 0 0; padding: 8px; background: #0f1624; border-radius: 4px; overflow-x: auto; color: #7c9ed9; font-size: 12px;">{{ parsed }}</pre>
-            </div>
-            <div>
-              <strong style="color: #fff;">실행된 SQL:</strong>
-              <pre style="margin: 8px 0 0 0; padding: 8px; background: #0f1624; border-radius: 4px; overflow-x: auto; color: #7c9ed9; font-size: 12px; white-space: pre-wrap;">{{ sql }}</pre>
-            </div>
-          </div>
-        </details>
-
-        {% if rows and rows|length > 0 and (parsed.group_by or parsed.is_outlier or parsed.is_overshoot or parsed.is_trace_compare) %}
-          <div class="plot-container">
-            <div style="margin-bottom: 16px; padding: 12px; background: #1a2332; border-radius: 8px; border-left: 4px solid #4a5d7e;">
-              <div style="font-weight: 600; color: #fff; margin-bottom: 8px;">📊 차트 해석 가이드</div>
-              <div style="font-size: 14px; color: #b0b0c0; line-height: 1.6;">
-                {% if parsed.group_by == 'step_name' %}
-                  • <strong style="color: #7c9ed9;">각 단계별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
-                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.<br/>
-                  • 단계별로 어떤 단계에서 값이 가장 높거나 낮은지 비교할 수 있습니다.
-                {% elif parsed.group_by == 'trace_id' %}
-                  • <strong style="color: #7c9ed9;">각 공정별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
-                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.<br/>
-                  • 공정 간 데이터를 비교하여 어떤 공정에서 값이 가장 높거나 낮은지 확인할 수 있습니다.
-                {% else %}
-                  • <strong style="color: #7c9ed9;">그룹별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.<br/>
-                  • <strong style="color: #ff6b6b;">빨간색 막대</strong>는 가장 높은 값을 의미합니다.
-                {% endif %}
-              </div>
-            </div>
-            <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-            <div style="display:none; color: #ff6b6b; padding: 20px; text-align: center;">
-              차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #7c9ed9;">여기를 클릭</a>하여 직접 확인하세요.
-            </div>
+        {% if parsed.group_by %}
+          <div class="tip">
+            💡 <strong>팁:</strong> 아래 차트에서 각 {{ "단계" if parsed.group_by == "step_name" else "공정" }}별 값을 시각적으로 비교할 수 있습니다.
           </div>
         {% endif %}
+      </div>
+        
+      <details style="margin-top: 16px;">
+        <summary>🔍 상세 정보 (SQL 쿼리 및 파라미터 보기)</summary>
+        <div class="meta-content">
+          <div style="margin-bottom: 16px;">
+            <strong style="color: #2d3748;">분석 파라미터:</strong>
+            <pre style="margin: 8px 0 0 0; padding: 12px; background: white; border-radius: 8px; overflow-x: auto; color: #4a5568; font-size: 12px; border: 1px solid #e2e8f0;">{{ parsed }}</pre>
+          </div>
+          <div>
+            <strong style="color: #2d3748;">실행된 SQL:</strong>
+            <pre style="margin: 8px 0 0 0; padding: 12px; background: white; border-radius: 8px; overflow-x: auto; color: #4a5568; font-size: 12px; white-space: pre-wrap; border: 1px solid #e2e8f0;">{{ sql }}</pre>
+          </div>
+        </div>
+      </details>
 
-        {% if rows and rows|length > 0 %}
-          <div style="margin-top: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <strong style="font-size: 16px;">📋 데이터 테이블</strong>
-                <span style="font-size: 13px; color: #b0b0c0; margin-left: 8px;">
-                  (총 {{ rows|length }}개 결과)
-                </span>
-              </div>
-              
-              {% if show_all_button %}
-                <div>
-                  <a href="/view?q={{ q|urlencode }}&show_all=1" style="padding: 8px 16px; background: #4a5d7e; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; transition: background 0.2s; display: inline-block;">
-                    전체 보기
-                  </a>
-                </div>
+      {% if rows and rows|length > 0 and (parsed.group_by or parsed.is_outlier or parsed.is_overshoot or parsed.is_trace_compare) %}
+        <div class="plot-container">
+          <div class="chart-guide">
+            <h4>📈 차트 안내</h4>
+            <ul>
+              {% if parsed.group_by == 'step_name' %}
+                <li>각 <strong>단계별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.</li>
+                <li><strong>빨간색 막대</strong>는 가장 높은 값을 의미합니다.</li>
+                <li>단계별로 어떤 단계에서 값이 가장 높거나 낮은지 비교할 수 있습니다.</li>
+              {% elif parsed.group_by == 'trace_id' %}
+                <li>각 <strong>공정별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.</li>
+                <li><strong>빨간색 막대</strong>는 가장 높은 값을 의미합니다.</li>
+                <li>공정 간 데이터를 비교하여 어떤 공정에서 값이 가장 높거나 낮은지 확인할 수 있습니다.</li>
+              {% else %}
+                <li><strong>그룹별</strong> {{ parsed.col|default('전체') }}의 {{ parsed.agg|replace('avg', '평균')|replace('min', '최소')|replace('max', '최대')|replace('count', '개수') }}을 보여줍니다.</li>
+                <li><strong>빨간색 막대</strong>는 가장 높은 값을 의미합니다.</li>
               {% endif %}
+            </ul>
+          </div>
+          <img src="/plot?q={{ q|urlencode }}" alt="분석 차트" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <div style="display:none; color: #fc8181; padding: 20px; text-align: center; background: #fed7d7; border-radius: 8px; margin-top: 12px;">
+            차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #667eea; font-weight: 600;">여기를 클릭</a>하여 직접 확인하세요.
+          </div>
+        </div>
+      {% endif %}
+
+      {% if rows and rows|length > 0 %}
+        <div style="margin-top: 32px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3 style="margin: 0; font-size: 20px; color: #2d3748;">📋 상세 데이터</h3>
+              <span style="font-size: 14px; color: #718096; margin-left: 8px;">
+                (총 {{ rows|length }}개 결과)
+              </span>
             </div>
             
-            <!-- 필터 및 정렬 UI -->
-            {% if parsed.group_by == 'step_name' %}
-              <div style="margin-bottom: 12px; padding: 12px; background: #1a2332; border-radius: 8px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                <div style="flex: 1; min-width: 200px;">
-                  <input type="text" id="stepFilter" placeholder="단계명 검색..." 
-                         style="width: 100%; padding: 8px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: #0f1624; color: #e0e0e0; font-size: 14px;" />
-                </div>
-                <div>
-                  <select id="sortBy" style="padding: 8px 12px; border: 1px solid #2a2a3e; border-radius: 6px; background: #0f1624; color: #e0e0e0; font-size: 14px; cursor: pointer;">
-                    <option value="value_desc">값 큰 순</option>
-                    <option value="value_asc">값 작은 순</option>
-                    <option value="name_asc">이름순 (A-Z)</option>
-                    <option value="name_desc">이름순 (Z-A)</option>
-                  </select>
-                </div>
+            {% if show_all_button %}
+              <div>
+                <a href="/view?q={{ q|urlencode }}&show_all=1" class="btn-secondary">
+                  전체 보기
+                </a>
               </div>
             {% endif %}
+          </div>
+            
+          <!-- 필터 및 정렬 UI -->
+          {% if parsed.group_by == 'step_name' %}
+            <div class="filter-section">
+              <div style="flex: 1; min-width: 200px;">
+                <input type="text" id="stepFilter" placeholder="🔍 단계명으로 검색..." 
+                       style="width: 100%;" />
+              </div>
+              <div>
+                <select id="sortBy" style="cursor: pointer;">
+                  <option value="value_desc">값 큰 순</option>
+                  <option value="value_asc">값 작은 순</option>
+                  <option value="name_asc">이름순 (A-Z)</option>
+                  <option value="name_desc">이름순 (Z-A)</option>
+                </select>
+              </div>
+            </div>
+          {% endif %}
             
           <div style="overflow-x: auto;">
             <table>
@@ -390,23 +625,23 @@
                     <th>
                       {{ k }}
                       {% if k == "trace_id" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(공정 ID)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(공정 ID)</span>
                       {% elif k == "step_name" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(단계명)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(단계명)</span>
                       {% elif k == "value" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(계산된 값)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(계산된 값)</span>
                       {% elif k == "n" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(개수)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(개수)</span>
                       {% elif k == "std" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(표준편차)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(표준편차)</span>
                       {% elif k == "min_val" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(최소값)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(최소값)</span>
                       {% elif k == "max_val" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(최대값)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(최대값)</span>
                       {% elif k == "diff" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(차이)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(차이)</span>
                       {% elif k == "outlier_count" %}
-                        <span style="font-size: 11px; font-weight: normal; color: #b0b0c0;">(이상치 개수)</span>
+                        <span style="font-size: 10px; font-weight: normal; opacity: 0.8;">(이상치 개수)</span>
                       {% endif %}
                     </th>
                   {% endfor %}
@@ -418,11 +653,11 @@
                     {% for k, v in r.items() %}
                       <td>
                         {% if k == "value" or k == "diff" or k == "diff_signed" or k == "trace1_avg" or k == "trace2_avg" %}
-                          <strong style="color: #7c9ed9;">{{ v }}</strong>
+                          <strong style="color: #667eea;">{{ v }}</strong>
                         {% elif k == "n" or k == "outlier_count" %}
-                          <strong style="color: #aaffaa;">{{ v }}</strong>
+                          <strong style="color: #48bb78;">{{ v }}</strong>
                         {% elif k == "std" or k == "min_val" or k == "max_val" or k == "avg_diff" %}
-                          <span style="color: #ffd93d;">{{ v }}</span>
+                          <span style="color: #f6ad55;">{{ v }}</span>
                         {% else %}
                           {{ v }}
                         {% endif %}
@@ -433,12 +668,13 @@
               </tbody>
             </table>
           </div>
-        {% else %}
-          <div class="no-results">
-            결과가 없습니다. 질문을 다시 확인하거나 다른 조건으로 검색해보세요.
-          </div>
-        {% endif %}
-      </div>
+        </div>
+      {% else %}
+        <div class="no-results">
+          <strong>결과가 없습니다</strong><br/>
+          <span style="font-size: 14px; margin-top: 8px; display: block;">질문을 다시 확인하거나 다른 조건으로 검색해보세요.</span>
+        </div>
+      {% endif %}
     {% endif %}
   </div>
 </body>

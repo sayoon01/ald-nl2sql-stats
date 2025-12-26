@@ -6,7 +6,9 @@ import duckdb  # type: ignore
 from pathlib import Path
 from src.nl_parse import Parsed
 
-DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+# 프로젝트 루트 기준 경로 (참고용, 실제로는 app.py에서 사용)
+PROJECT_ROOT = Path(__file__).parent.parent
+DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def build_stable_avg_sql(p: Parsed) -> Tuple[str, List]:
     """안정화 구간 평균 (초반 10% 제외)"""
@@ -19,7 +21,7 @@ def build_stable_avg_sql(p: Parsed) -> Tuple[str, List]:
             {p.col},
             ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY timestamp) as rn,
             COUNT(*) OVER (PARTITION BY step_name) as total
-        FROM traces
+        FROM traces_dedup
         {where_sql}
     ),
     stable AS (
@@ -49,13 +51,13 @@ def build_overshoot_sql(p: Parsed) -> Tuple[str, List]:
         MIN(pressact - pressset) AS min_diff,
         MAX(pressact - pressset) AS max_diff,
         STDDEV(pressact - pressset) AS std
-    FROM traces
+    FROM traces_dedup
     {where_sql}
     GROUP BY step_name
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
@@ -73,7 +75,7 @@ def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
             MIN(timestamp) AS start_time,
             MAX(timestamp) AS end_time,
             EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) AS dwell_seconds
-        FROM traces
+        FROM traces_dedup
         {where_sql}
         GROUP BY trace_id, step_name
     )
@@ -86,8 +88,8 @@ def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
     GROUP BY step_name
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
@@ -109,7 +111,7 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
         SELECT 
             AVG({p.col}) AS mean_val,
             STDDEV({p.col}) AS std_val
-        FROM traces
+        FROM traces_dedup
         {where_sql}
     ),
     z_scores AS (
@@ -121,7 +123,7 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
                 THEN ABS({p.col} - (SELECT mean_val FROM global_stats)) / (SELECT std_val FROM global_stats)
                 ELSE 0
             END AS z_score
-        FROM traces
+        FROM traces_dedup
         {where_sql}
         WHERE {p.col} IS NOT NULL
     )
@@ -135,8 +137,8 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
     HAVING SUM(CASE WHEN z_score > {z_threshold} THEN 1 ELSE 0 END) > 0
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
@@ -152,7 +154,7 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         SELECT 
             step_name,
             AVG({col}) AS avg_val
-        FROM traces
+        FROM traces_dedup
         WHERE trace_id = ?
         GROUP BY step_name
     ),
@@ -160,7 +162,7 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         SELECT 
             step_name,
             AVG({col}) AS avg_val
-        FROM traces
+        FROM traces_dedup
         WHERE trace_id = ?
         GROUP BY step_name
     )
