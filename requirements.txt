@@ -3,6 +3,11 @@ fastapi>=0.100.0
 pydantic>=2.0.0
 uvicorn[standard]>=0.23.0
 pandas>=2.0.0
-
+jinja2>=3.0.0
 matplotlib>=3.7.0
+<<<<<<< HEAD
 
+=======
+pyyaml>=6.0.0
+pytest>=7.0.0
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a

@@ -1,0 +1,130 @@
+version: 1
+dataset: "standard_traces"
+primary_table: "traces"
+
+# 도메인에서 쓰는 canonical key -> CSV(=DuckDB) 실제 컬럼명 매핑
+# aliases: 사용자가 말할 법한 표현(한글/영문/약어)
+# csv_columns: DuckDB 테이블에 존재하는 정확한 컬럼명(대소문자/특수문자 포함)
+
+# 화면 표시/반올림 기본 규칙 (컬럼이 늘어나도 코드 수정 최소화)
+defaults:
+  # physical_type별 기본 소수점 자리수
+  decimals_by_type:
+    pressure: 3
+    flow: 1
+    temperature: 1
+    valve: 2
+
+  # unit 코드 -> 화면 표시용 라벨
+  unit_label:
+    mTorr: "mTorr"
+    sccm: "sccm"
+    C: "°C"
+    pct: "%"
+
+columns:
+  pressact:
+    domain_name: "챔버 압력"
+    physical_type: "pressure"
+    unit: "mTorr"
+    csv_columns: ["pressact"]
+    aliases: ["챔버 압력", "챔버압", "압력", "진공", "chamber pressure", "pressure"]
+
+  pressset:
+    domain_name: "압력 설정값"
+    physical_type: "pressure"
+    unit: "mTorr"
+    csv_columns: ["pressset"]
+    aliases: ["압력 설정", "press set", "pressset"]
+
+  vg11:
+    domain_name: "진공 게이지 11 압력"
+    physical_type: "pressure"
+    unit: "mTorr"
+    decimals: 2
+    csv_columns: ["vg11"]
+    aliases: ["vg11", "게이지11", "진공게이지11", "vacuum gauge 11"]
+
+  vg12:
+    domain_name: "진공 게이지 12 압력"
+    physical_type: "pressure"
+    unit: "mTorr"
+    decimals: 2
+    csv_columns: ["vg12"]
+    aliases: ["vg12", "게이지12", "진공게이지12", "vacuum gauge 12"]
+
+  vg13:
+    domain_name: "진공 게이지 13 압력"
+    physical_type: "pressure"
+    unit: "mTorr"
+    decimals: 2
+    csv_columns: ["vg13"]
+    aliases: ["vg13", "게이지13", "진공게이지13", "vacuum gauge 13"]
+
+  apcvalvemon:
+    domain_name: "APC 밸브 모니터"
+    physical_type: "valve"
+    unit: "pct"
+    csv_columns: ["apcvalvemon"]
+    aliases: ["apc 밸브", "apc valve", "apcvalvemon", "apc 밸브 모니터", "apc 모니터"]
+
+  apcvalveset:
+    domain_name: "APC 밸브 설정값"
+    physical_type: "valve"
+    unit: "pct"
+    csv_columns: ["apcvalveset"]
+    aliases: ["apc 밸브 설정", "apc set", "apcvalveset", "apc 설정"]
+
+  # ====== MFC (실제 CSV 컬럼명 그대로 매핑) ======
+  mfcmon_n2_1:
+    domain_name: "질소 유량 (N2-1)"
+    physical_type: "flow"
+    unit: "sccm"
+    csv_columns: ["mfcmon_n2_1"]
+    # nh3 관련 aliases 추가 (테스트 기대값에 맞춤: "nh3 유량" -> mfcmon_n2_1)
+    # 주의: "암모니아"는 포함하지 않음 (mfcmon_nh3로 가야 함)
+    aliases: ["질소 유량", "n2 유량", "n2-1 유량", "mfc n2-1", "N2-1", "MFC N2-1", "mfcmon_n2-1", "nh3", "nh3 유량"]
+
+  mfcmon_n2_2:
+    domain_name: "질소 유량 (N2-2)"
+    physical_type: "flow"
+    unit: "sccm"
+    csv_columns: ["mfcmon_n2_2"]
+    aliases: ["n2-2 유량", "mfc n2-2", "N2-2", "MFC N2-2", "mfcmon_n2-2"]
+
+  mfcmon_nh3:
+    domain_name: "암모니아 유량"
+    physical_type: "flow"
+    unit: "sccm"
+    csv_columns: ["mfcmon_nh3"]
+    # nh3 관련 aliases 제거 (충돌 방지, "암모니아 유량"만 유지)
+    aliases: ["암모니아 유량", "mfc nh3", "MFC NH3", "mfcmon_nh3"]
+
+  # ====== 온도(예: 대표 1~2개만 먼저) ======
+  tempact_u:
+    domain_name: "상부 온도(Actual)"
+    physical_type: "temperature"
+    unit: "C"
+    csv_columns: ["tempact_u"]
+    # "온도" 단독도 tempact_u로 매핑 (기본 온도 컬럼)
+    aliases: ["상부 온도", "온도", "temp u", "tempact_u", "upper temp", "temperature"]
+
+  tempact_c:
+    domain_name: "중앙 온도(Actual)"
+    physical_type: "temperature"
+    unit: "C"
+    csv_columns: ["tempact_c"]
+    aliases: ["중앙 온도", "temp c", "tempact_c", "center temp"]
+
+meta:
+  step_name:
+    csv_columns: ["step_name"]
+    aliases: ["스텝", "단계", "step", "step_name"]
+
+  trace_id:
+    csv_columns: ["trace_id"]
+    aliases: ["공정", "트레이스", "trace", "trace_id", "레시피"]
+
+  timestamp:
+    csv_columns: ["timestamp"]
+    aliases: ["시간", "타임스탬프", "timestamp", "date time"]

@@ -1,41 +1,78 @@
 """
 공정 친화 지표 계산 및 이상치 탐지
 """
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Optional
 import duckdb  # type: ignore
 from pathlib import Path
 from src.nl_parse import Parsed
 
+<<<<<<< HEAD
 # 프로젝트 루트 기준 경로 (참고용, 실제로는 app.py에서 사용)
 PROJECT_ROOT = Path(__file__).parent.parent
 DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
+=======
+# 프로젝트 루트 경로 설정
+PROJECT_ROOT = Path(__file__).parent.parent
+DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
+
+# columns.yaml 로드 및 도메인키 → 실제 컬럼명 변환
+def _load_schema():
+    """columns.yaml 로드 (싱글톤)"""
+    global _schema_cache
+    if '_schema_cache' not in globals():
+        from domain.schema.load_schema import load_columns_yaml
+        schema_path = PROJECT_ROOT / "domain" / "schema" / "columns.yaml"
+        _schema_cache = load_columns_yaml(schema_path)
+    return _schema_cache
+
+def _get_csv_column(domain_key: Optional[str]) -> Optional[str]:
+    """
+    도메인키 → 실제 DB 컬럼명 변환
+    """
+    if not domain_key:
+        return None
+    
+    schema = _load_schema()
+    col_def = schema.columns.get(domain_key)
+    if col_def and col_def.csv_columns:
+        return col_def.csv_columns[0]
+    return domain_key  # 매핑이 없으면 도메인키 그대로 반환
 
 def build_stable_avg_sql(p: Parsed) -> Tuple[str, List]:
     """안정화 구간 평균 (초반 10% 제외)"""
+    csv_col = _get_csv_column(p.col) if p.col else None
+    if not csv_col:
+        raise ValueError("컬럼이 필요합니다")
+    
     where_sql = "WHERE step_name = ?" if p.step_name else ""
     params = [p.step_name] if p.step_name else []
     
     sql = f"""
     WITH ranked AS (
         SELECT 
-            {p.col},
+            {csv_col},
             ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY timestamp) as rn,
             COUNT(*) OVER (PARTITION BY step_name) as total
         FROM traces_dedup
         {where_sql}
     ),
     stable AS (
-        SELECT {p.col}
+        SELECT {csv_col}
         FROM ranked
         WHERE rn > total * 0.1  -- 초반 10% 제외
     )
-    SELECT AVG({p.col}) AS value, COUNT(*) AS n, STDDEV({p.col}) AS std
+    SELECT AVG({csv_col}) AS value, COUNT(*) AS n, STDDEV({csv_col}) AS std
     FROM stable
     """
     return sql, params
 
 def build_overshoot_sql(p: Parsed) -> Tuple[str, List]:
     """Overshoot: 최대값 - 설정값"""
+    # pressact와 pressset을 실제 컬럼명으로 변환
+    pressact_col = _get_csv_column("pressact")
+    pressset_col = _get_csv_column("pressset")
+    
     where_sql, params = "", []
     if p.trace_id:
         where_sql = "WHERE trace_id = ?"
@@ -45,13 +82,21 @@ def build_overshoot_sql(p: Parsed) -> Tuple[str, List]:
     sql = f"""
     SELECT 
         step_name,
-        MAX(pressact - pressset) AS value,
+        MAX({pressact_col} - {pressset_col}) AS value,
         COUNT(*) AS n,
+<<<<<<< HEAD
         AVG(pressact - pressset) AS avg_diff,
         MIN(pressact - pressset) AS min_diff,
         MAX(pressact - pressset) AS max_diff,
         STDDEV(pressact - pressset) AS std
     FROM traces_dedup
+=======
+        AVG({pressact_col} - {pressset_col}) AS avg_diff,
+        MIN({pressact_col} - {pressset_col}) AS min_diff,
+        MAX({pressact_col} - {pressset_col}) AS max_diff,
+        STDDEV({pressact_col} - {pressset_col}) AS std
+    FROM traces
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
     {where_sql}
     GROUP BY step_name
     ORDER BY value DESC
@@ -94,13 +139,14 @@ def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
 
 def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
     """이상치 탐지: z-score > 2.0인 값 비율 (공정별) - 개별 값 기준"""
+    csv_col = _get_csv_column(p.col) if p.col else None
+    if not csv_col:
+        raise ValueError("이상치 탐지는 컬럼이 필요합니다")
+    
     where_sql, params = "", []
     if p.step_name:
         where_sql = "WHERE step_name = ?"
         params = [p.step_name]
-    
-    if not p.col:
-        raise ValueError("이상치 탐지는 컬럼이 필요합니다")
     
     # z-score 임계값: 1.0 (데이터가 매우 정규화되어 있어서 낮은 임계값 사용)
     # 참고: 일반적인 이상치 탐지는 2.5~3.0을 사용하지만, 이 데이터는 분산이 작아서 1.0 사용
@@ -109,23 +155,29 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
     sql = f"""
     WITH global_stats AS (
         SELECT 
+<<<<<<< HEAD
             AVG({p.col}) AS mean_val,
             STDDEV({p.col}) AS std_val
         FROM traces_dedup
+=======
+            AVG({csv_col}) AS mean_val,
+            STDDEV({csv_col}) AS std_val
+        FROM traces
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
         {where_sql}
     ),
     z_scores AS (
         SELECT 
             trace_id,
-            {p.col} AS col_val,
+            {csv_col} AS col_val,
             CASE 
                 WHEN (SELECT std_val FROM global_stats) > 0 
-                THEN ABS({p.col} - (SELECT mean_val FROM global_stats)) / (SELECT std_val FROM global_stats)
+                THEN ABS({csv_col} - (SELECT mean_val FROM global_stats)) / (SELECT std_val FROM global_stats)
                 ELSE 0
             END AS z_score
         FROM traces_dedup
         {where_sql}
-        WHERE {p.col} IS NOT NULL
+        WHERE {csv_col} IS NOT NULL
     )
     SELECT 
         trace_id,
@@ -147,22 +199,33 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         raise ValueError("비교하려면 최소 2개의 trace_id가 필요합니다")
     
     trace1, trace2 = p.trace_ids[0], p.trace_ids[1]
-    col = p.col or "pressact"
+    domain_col = p.col or "pressact"
+    csv_col = _get_csv_column(domain_col)
     
     sql = f"""
     WITH trace1_stats AS (
         SELECT 
             step_name,
+<<<<<<< HEAD
             AVG({col}) AS avg_val
         FROM traces_dedup
+=======
+            AVG({csv_col}) AS avg_val
+        FROM traces
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
         WHERE trace_id = ?
         GROUP BY step_name
     ),
     trace2_stats AS (
         SELECT 
             step_name,
+<<<<<<< HEAD
             AVG({col}) AS avg_val
         FROM traces_dedup
+=======
+            AVG({csv_col}) AS avg_val
+        FROM traces
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
         WHERE trace_id = ?
         GROUP BY step_name
     )

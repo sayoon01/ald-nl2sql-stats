@@ -4,9 +4,15 @@ import re
 import json
 from collections import defaultdict
 
+<<<<<<< HEAD
 # 프로젝트 내부의 CSV 파일 사용
 PROJECT_ROOT = Path(__file__).parent.parent
 IN_GLOB = str(PROJECT_ROOT / "data_in" / "*.csv")
+=======
+# 프로젝트 루트 경로 설정
+PROJECT_ROOT = Path(__file__).parent.parent
+IN_GLOB = str(Path.home() / "standard_traces" / "*.csv")  # CSV 파일 위치는 사용자 홈 디렉토리 기준
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
 OUT_DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def slugify(name: str) -> str:
@@ -171,7 +177,28 @@ def main():
       {", ".join(select_parts)}
     FROM raw;
     """)
+    
+    # 누락된 컬럼 추가 (YAML에 정의되어 있지만 CSV에 없는 경우)
+    # 필요한 컬럼 목록 (columns.yaml 기준)
+    required_cols = {
+        'mfcmon_n2_1': 'DOUBLE',
+        'mfcmon_n2_2': 'DOUBLE', 
+        'mfcmon_nh3': 'DOUBLE',
+        'tempact_c': 'DOUBLE',
+        'tempact_u': 'DOUBLE',
+    }
+    
+    # 현재 traces 테이블의 컬럼 확인
+    existing_cols = set(row[0].lower() for row in con.execute("DESCRIBE traces").fetchall())
+    
+    # 누락된 컬럼 추가
+    for col_name, col_type in required_cols.items():
+        if col_name.lower() not in existing_cols:
+            # NULL로 초기화 (나중에 데이터가 있으면 업데이트 가능)
+            con.execute(f"ALTER TABLE traces ADD COLUMN {col_name} {col_type} DEFAULT NULL")
+            print(f"  추가된 컬럼: {col_name} ({col_type})")
 
+<<<<<<< HEAD
     # 중복 제거 뷰 생성: (trace_id, timestamp) 중복 시 마지막 행 선택
     # 컬럼 목록 동적 생성 (rn 제외)
     desc = con.execute("DESCRIBE traces").fetchall()
@@ -202,6 +229,20 @@ def main():
     CREATE OR REPLACE VIEW traces_key AS
     SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13
     FROM traces_dedup;
+=======
+    # 인덱스는 DuckDB에선 선택 사항. 대신 분석용 뷰 하나 만들어둠.
+    # 모든 주요 컬럼 포함 (누락된 컬럼도 포함)
+    con.execute("""
+    CREATE OR REPLACE VIEW traces_key AS
+    SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13,
+           apcvalvemon, apcvalveset,
+           COALESCE(mfcmon_n2_1, 0.0) as mfcmon_n2_1,
+           COALESCE(mfcmon_n2_2, 0.0) as mfcmon_n2_2,
+           COALESCE(mfcmon_nh3, 0.0) as mfcmon_nh3,
+           COALESCE(tempact_c, 0.0) as tempact_c,
+           COALESCE(tempact_u, 0.0) as tempact_u
+    FROM traces;
+>>>>>>> 378f42a2115c8718668a2287e9ab54018ecf432a
     """)
 
     n_rows = con.execute("SELECT COUNT(*) FROM traces_dedup").fetchone()[0]

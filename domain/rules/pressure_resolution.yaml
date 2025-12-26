@@ -1,0 +1,38 @@
+version: 1
+
+# "압력" 같이 모호한 단어가 등장했을 때, 문맥에 따라 어떤 컬럼으로 해석할지 결정
+# 예) "VG11 압력" => vg11
+# 예) "챔버 압력" => pressact
+# 예) "압력 평균" => pressact (기본)
+
+resolution:
+  # 1) 특정 센서/키워드가 같이 나오면 그 센서를 우선
+  context_overrides:
+    - if_any_tokens: ["vg11", "게이지11"]
+      prefer_column: "vg11"
+      suppress_generic_pressure_token: true
+
+    - if_any_tokens: ["vg12", "게이지12"]
+      prefer_column: "vg12"
+      suppress_generic_pressure_token: true
+
+    - if_any_tokens: ["vg13", "게이지13"]
+      prefer_column: "vg13"
+      suppress_generic_pressure_token: true
+
+    - if_any_tokens: ["챔버", "chamber"]
+      prefer_column: "pressact"
+      suppress_generic_pressure_token: false
+
+  # 2) 기본값
+  defaults:
+    generic_pressure_column: "pressact"
+    generic_flow_column: "mfcmon_n2_1"
+
+  # 3) "질소 유량"처럼 말했는데 채널이 안 나왔을 때의 룰
+  flow_channel_rules:
+    - if_any_tokens: ["질소", "n2"]
+      prefer_column: "mfcmon_n2_1"
+    - if_any_tokens: ["암모니아", "nh3"]
+      prefer_column: "mfcmon_nh3"
+

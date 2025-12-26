@@ -2,6 +2,7 @@ import duckdb  # type: ignore
 from pathlib import Path
 from src.nl_parse import parse_question
 from src.sql_builder import build_sql
+from domain.rules.normalization import normalize
 from src.process_metrics import (
     build_stable_avg_sql,
     build_overshoot_sql,
@@ -15,8 +16,13 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def main():
-    q = input("질문: ").strip()
-    parsed = parse_question(q)
+    question = input("질문: ").strip()
+    
+    # 정규화
+    norm = normalize(question)
+    
+    # 파싱
+    parsed = parse_question(question)
     
     # 공정 친화 지표 또는 이상치 탐지 처리
     if parsed.is_trace_compare:
@@ -35,6 +41,10 @@ def main():
     con = duckdb.connect(str(DB))
     df = con.execute(sql, params).df()
 
+    print("\n[원문 질문]")
+    print(f"  {norm.raw}")
+    print("\n[정규화된 질문]")
+    print(f"  {norm.text}")
     print("\n[PARSED]")
     print(parsed)
     print("\n[SQL]")

@@ -1,0 +1,17 @@
+# 단위 정의 (포맷팅용)
+
+mTorr:
+  symbol: mTorr
+  label: 밀리토르
+  precision: 3
+
+sccm:
+  symbol: sccm
+  label: 표준 입방 센티미터/분
+  precision: 2
+
+percent:
+  symbol: "%"
+  label: 퍼센트
+  precision: 2
+

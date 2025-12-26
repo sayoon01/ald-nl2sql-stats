@@ -1,0 +1,59 @@
+# 집계 함수 동의어
+
+avg:
+  - 평균
+  - mean
+  - average
+  - 평균값
+
+min:
+  - 최소
+  - min
+  - 최소값
+  - minimum
+
+max:
+  - 최대
+  - max
+  - 최고
+  - 최대값
+  - maximum
+
+count:
+  - 개수
+  - 건수
+  - count
+  - 갯수
+
+std:
+  - 표준편차
+  - std
+  - stddev
+  - 변동성
+  - 흔들림
+  - 분산
+  - variance
+
+p50:
+  - 중앙값
+  - median
+  - p50
+  - 50퍼센타일
+  - 50퍼센트
+
+p95:
+  - p95
+  - 95퍼센타일
+  - 95퍼센트
+
+p99:
+  - p99
+  - 99퍼센타일
+  - 99퍼센트
+
+null_ratio:
+  - 결측률
+  - null 비율
+  - missing ratio
+  - 결측 비율
+
