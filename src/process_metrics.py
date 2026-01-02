@@ -4,7 +4,7 @@
 from typing import Tuple, List, Dict, Any, Optional
 import duckdb  # type: ignore
 from pathlib import Path
-from src.nl_parse import Parsed
+from src.nl_parse_v2 import Parsed
 
 # 프로젝트 루트 기준 경로 (참고용, 실제로는 app.py에서 사용)
 PROJECT_ROOT = Path(__file__).parent.parent

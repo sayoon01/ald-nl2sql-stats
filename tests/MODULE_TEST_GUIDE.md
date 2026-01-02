@@ -92,15 +92,18 @@ print(f'✅ 이상치 탐지 SQL: {len(sql)} chars')
 ### 5. 차트 렌더링 (`src/charts/renderer.py`)
 
 ```bash
-python3 -c "
-import pandas as pd
-from src.nl_parse_v2 import Parsed
-from src.charts.renderer import render_chart
-p = Parsed(metric='avg', column='pressact', group_by='trace_id')
-df = pd.DataFrame({'trace_id': ['t1', 't2'], 'value': [10, 20]})
-chart_bytes = render_chart(p, df)
-print(f'✅ 차트 생성: {len(chart_bytes)} bytes')
-"
+# 테스트 전용 모듈(src/charts)이 삭제되어 차트 렌더링 테스트는 비활성화되었습니다.
+# 실제 차트 생성은 src/chart_templates.py와 src/plot_generator.py를 사용합니다.
+
+# python3 -c "
+# import pandas as pd
+# from src.nl_parse_v2 import Parsed
+# from src.charts.renderer import render_chart  # 삭제됨
+# p = Parsed(metric='avg', column='pressact', group_by='trace_id')
+# df = pd.DataFrame({'trace_id': ['t1', 't2'], 'value': [10, 20]})
+# chart_bytes = render_chart(p, df)
+# print(f'✅ 차트 생성: {len(chart_bytes)} bytes')
+# "
 ```
 
 **테스트 포인트:**

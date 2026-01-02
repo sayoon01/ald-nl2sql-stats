@@ -9,7 +9,7 @@
 """
 from typing import Optional
 import pandas as pd
-from src.nl_parse import Parsed
+from src.nl_parse_v2 import Parsed
 from src.semantic_resolver import get_metadata_by_physical_column
 
 # 컬럼 한글 라벨은 semantic_registry에서 가져옴

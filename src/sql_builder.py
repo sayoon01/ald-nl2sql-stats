@@ -9,10 +9,7 @@ SQL Builder: Parsed → SQL
 모든 쿼리는 FROM traces_dedup 사용
 """
 from typing import Tuple, List, Optional
-try:
-    from src.nl_parse_v2 import Parsed
-except ImportError:
-    from src.nl_parse import Parsed
+from src.nl_parse_v2 import Parsed
 
 # 허용된 컬럼명 화이트리스트 (SQL 인젝션 방지)
 # TODO: semantic_resolver로 교체 예정
@@ -215,7 +212,7 @@ def build_sql(p: Parsed, include_stats: bool = True) -> Tuple[str, List]:
     
     중요: 이 함수는 Parsed 객체만 받습니다. 문자열을 받지 않습니다.
     올바른 사용법:
-        from src.nl_parse import parse_question
+        from src.nl_parse_v2 import parse_question
         from src.sql_builder import build_sql
         
         p = parse_question("압력 평균")

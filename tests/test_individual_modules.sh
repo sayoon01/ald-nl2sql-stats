@@ -57,19 +57,12 @@ print(f'✅ 이상치 탐지 SQL 빌드 성공')
 print(f'   SQL 길이: {len(sql)} chars')
 "
 
-# 5. 차트 렌더링 테스트
+# 5. 차트 렌더링 테스트 (비활성화: 테스트 전용 모듈 삭제됨)
 echo ""
 echo "5. 차트 렌더링 모듈 테스트"
 echo "-------------------"
-python3 -c "
-import pandas as pd
-from src.nl_parse_v2 import Parsed
-from src.charts.renderer import render_chart
-p = Parsed(metric='avg', column='pressact', group_by='trace_id', analysis_type='group_profile')
-df = pd.DataFrame({'trace_id': ['t1', 't2'], 'value': [10, 20]})
-chart = render_chart(df, p)
-print(f'✅ 차트 렌더링 성공: {len(chart.body)} bytes')
-" 2>/dev/null | grep -v "UserWarning" | grep -v "Glyph" || echo "⚠️  차트 렌더링 스킵 (의존성 문제)"
+echo "⚠️  테스트 전용 모듈(src/charts)이 삭제되어 스킵됩니다"
+echo "   실제 차트 생성은 src/chart_templates.py와 src/plot_generator.py를 사용합니다"
 
 # 6. 요약 생성 테스트
 echo ""

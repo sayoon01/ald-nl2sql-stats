@@ -7,10 +7,7 @@ Payload Builder: UI용 표준 payload 생성
 """
 from typing import Dict, Any
 import pandas as pd
-try:
-    from src.nl_parse_v2 import Parsed
-except ImportError:
-    from src.nl_parse import Parsed
+from src.nl_parse_v2 import Parsed
 from src.semantic_resolver import get_metadata_by_physical_column
 
 
@@ -118,10 +115,7 @@ def build_payload(question: str, con) -> Dict[str, Any]:
             "meta": Dict
         }
     """
-    try:
-        from src.nl_parse_v2 import parse_question
-    except ImportError:
-        from src.nl_parse import parse_question
+    from src.nl_parse_v2 import parse_question
     from src.sql_builder import build_sql
     from src.interpreter import interpret
     from urllib.parse import quote

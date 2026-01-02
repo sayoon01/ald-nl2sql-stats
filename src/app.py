@@ -17,11 +17,8 @@ import sys
 # 한글 폰트 설정 (모듈 import 시 1회 실행)
 from src.utils.mpl_korean import setup_korean_font
 setup_korean_font()
-# 기존 파서와 새 파서 선택 가능
-try:
-    from src.nl_parse_v2 import parse_question  # 새 도메인 메타데이터 기반 파서
-except ImportError:
-    from src.nl_parse import parse_question  # 기존 파서 (fallback)
+# 도메인 메타데이터 기반 파서
+from src.nl_parse_v2 import parse_question, Parsed
 
 # 정규화 함수 import
 from domain.rules.normalization import normalize
@@ -222,7 +219,6 @@ def make_summary(parsed: dict, rows: list) -> str:
     일반 케이스는 interpreter 사용하여 사람이 읽기 쉬운 문장으로 변환
     """
     from src.interpreter import interpret
-    from src.nl_parse import Parsed
     
     # 특수 케이스: trace 비교
     if parsed.get("is_trace_compare") and rows:
@@ -777,34 +773,6 @@ def plot_api(q: str):
         plt.close(fig)
         return Response(buf.read(), media_type="image/png")
 
-# ✅ CSV 다운로드
-@app.get("/api/csv")
-def download_csv(q: str):
-    try:
-        parsed_obj = parse_question(q)
-        
-        # 공정 친화 지표 또는 이상치 탐지 처리 (우선순위: trace_compare > overshoot > outlier > 기타)
-        if parsed_obj.is_trace_compare:
-            sql, params = build_trace_compare_sql(parsed_obj)
-        elif parsed_obj.is_overshoot:
-            sql, params = build_overshoot_sql(parsed_obj)
-        elif parsed_obj.is_outlier:
-            sql, params = build_outlier_detection_sql(parsed_obj)
-        elif parsed_obj.is_dwell_time:
-            sql, params = build_dwell_time_sql(parsed_obj)
-        elif parsed_obj.is_stable_avg:
-            sql, params = build_stable_avg_sql(parsed_obj)
-        else:
-            sql, params = build_sql(parsed_obj)
-        
-        con = duckdb.connect(str(DB))
-        df = con.execute(sql, params).df()
-        
-        csv_str = df.to_csv(index=False)
-        return Response(content=csv_str, media_type="text/csv", 
-                       headers={"Content-Disposition": f"attachment; filename=query_result.csv"})
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
 
 # ✅ 히스토리 저장/조회 (간단한 JSON 파일 기반)
 HISTORY_FILE = PROJECT_ROOT / "data" / "history.json"

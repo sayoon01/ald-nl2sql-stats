@@ -18,7 +18,7 @@ from src.process_metrics import (
     build_outlier_detection_sql,
     build_trace_compare_sql,
 )
-from src.charts.renderer import render_chart
+# from src.charts.renderer import render_chart  # 테스트 전용 모듈 삭제됨
 from src.app import make_summary
 from domain.rules.normalization import normalize
 
@@ -155,38 +155,10 @@ def test_process_metrics():
 
 
 def test_chart_rendering():
-    """차트 렌더링 모듈 테스트"""
+    """차트 렌더링 모듈 테스트 (비활성화: 테스트 전용 모듈 삭제됨)"""
     print("\n=== 5. 차트 렌더링 모듈 테스트 ===")
-    
-    if not DB.exists():
-        print(f"⚠️  DB 파일이 없습니다: {DB}")
-        return
-    
-    try:
-        con = duckdb.connect(str(DB))
-        
-        # 샘플 데이터 생성
-        import pandas as pd
-        sample_data = pd.DataFrame({
-            'trace_id': ['trace1', 'trace2', 'trace3'],
-            'value': [10.5, 20.3, 15.7]
-        })
-        
-        parsed = Parsed(
-            metric="avg",
-            column="pressact",
-            group_by="trace_id",
-            analysis_type="group_profile"
-        )
-        
-        # 차트 렌더링 테스트
-        chart_bytes = render_chart(parsed, sample_data)
-        print(f"✅ 차트 렌더링 성공")
-        print(f"   차트 크기: {len(chart_bytes)} bytes")
-        
-        con.close()
-    except Exception as e:
-        print(f"❌ 차트 렌더링 실패: {e}")
+    print("⚠️  테스트 전용 모듈(src/charts)이 삭제되어 스킵됩니다")
+    print("   실제 차트 생성은 src/chart_templates.py와 src/plot_generator.py를 사용합니다")
 
 
 def test_summary():

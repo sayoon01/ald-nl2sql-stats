@@ -6,7 +6,7 @@ from collections import defaultdict
 
 # 프로젝트 내부의 CSV 파일 사용
 PROJECT_ROOT = Path(__file__).parent.parent
-IN_GLOB = str(PROJECT_ROOT / "data_in" / "*.csv")
+IN_GLOB = str(PROJECT_ROOT / "data" / "*.csv")
 OUT_DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 def slugify(name: str) -> str:
@@ -20,7 +20,7 @@ def slugify(name: str) -> str:
 
 def _generate_catalog(con: duckdb.DuckDBPyConnection, project_root: Path) -> None:
     """컬럼 목록을 자동 분류하여 catalog_physical.json 생성"""
-    catalog_file = project_root / "catalog_physical.json"
+    catalog_file = project_root / "config" / "catalog_physical.json"
     
     # 컬럼 목록 가져오기 (traces_dedup에서)
     cols = con.execute("DESCRIBE traces_dedup").df()
@@ -172,25 +172,7 @@ def main():
     FROM raw;
     """)
     
-    # 누락된 컬럼 추가 (YAML에 정의되어 있지만 CSV에 없는 경우)
-    # 필요한 컬럼 목록 (columns.yaml 기준)
-    required_cols = {
-        'mfcmon_n2_1': 'DOUBLE',
-        'mfcmon_n2_2': 'DOUBLE', 
-        'mfcmon_nh3': 'DOUBLE',
-        'tempact_c': 'DOUBLE',
-        'tempact_u': 'DOUBLE',
-    }
-    
-    # 현재 traces 테이블의 컬럼 확인
-    existing_cols = set(row[0].lower() for row in con.execute("DESCRIBE traces").fetchall())
-    
-    # 누락된 컬럼 추가
-    for col_name, col_type in required_cols.items():
-        if col_name.lower() not in existing_cols:
-            # NULL로 초기화 (나중에 데이터가 있으면 업데이트 가능)
-            con.execute(f"ALTER TABLE traces ADD COLUMN {col_name} {col_type} DEFAULT NULL")
-            print(f"  추가된 컬럼: {col_name} ({col_type})")
+    print(f"✅ traces 테이블 생성 완료 (모든 컬럼 포함)")
 
     # 중복 제거 뷰 생성: (trace_id, timestamp) 중복 시 마지막 행 선택
     # 컬럼 목록 동적 생성 (rn 제외)
@@ -217,24 +199,9 @@ def main():
     WHERE rn = 1;
     """)
     
-    # 분석용 뷰 (기존 유지)
-    con.execute("""
-    CREATE OR REPLACE VIEW traces_key AS
-    SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13
-    FROM traces_dedup;
-    # 인덱스는 DuckDB에선 선택 사항. 대신 분석용 뷰 하나 만들어둠.
-    # 모든 주요 컬럼 포함 (누락된 컬럼도 포함)
-    con.execute("""
-    CREATE OR REPLACE VIEW traces_key AS
-    SELECT trace_id, step_name, timestamp, pressact, pressset, vg11, vg12, vg13,
-           apcvalvemon, apcvalveset,
-           COALESCE(mfcmon_n2_1, 0.0) as mfcmon_n2_1,
-           COALESCE(mfcmon_n2_2, 0.0) as mfcmon_n2_2,
-           COALESCE(mfcmon_nh3, 0.0) as mfcmon_nh3,
-           COALESCE(tempact_c, 0.0) as tempact_c,
-           COALESCE(tempact_u, 0.0) as tempact_u
-    FROM traces;
-    """)
+    # 분석용 뷰 (traces_dedup의 모든 컬럼 포함)
+    # traces_dedup은 이미 모든 컬럼을 포함하므로 별도 뷰 불필요
+    # 필요시 traces_dedup을 직접 사용
 
     n_rows = con.execute("SELECT COUNT(*) FROM traces_dedup").fetchone()[0]
     n_cols = con.execute("SELECT COUNT(*) FROM (DESCRIBE traces)").fetchone()[0]
