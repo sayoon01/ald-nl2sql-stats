@@ -25,6 +25,9 @@ ENV/
 # Data files (히스토리/즐겨찾기는 커밋하지 않음)
 data/*.json
 
+# CSV files (큰 파일이므로 Git에 포함하지 않음)
+data_in/*.csv
+
 # OS
 .DS_Store
 Thumbs.db
@@ -43,4 +46,5 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
 
