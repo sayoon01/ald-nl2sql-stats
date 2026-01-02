@@ -154,6 +154,13 @@ python -m src.preprocess_duckdb
      - `valve`: 35개 (valveact_*, valveset_* 등)
      - `aux`: 52개 (auxmon_* 등)
      - `other`: 10개 (기타 컬럼)
+   
+   **컬럼 분류 규칙 위치**:
+   - **규칙 (로직)**: `src/preprocess_duckdb.py`의 `_generate_catalog()` 함수에 하드코딩됨
+     - 분류 로직을 수정하려면 이 함수의 코드를 변경해야 함
+   - **결과 (데이터)**: `config/catalog_physical.json`에 저장됨
+     - 규칙을 실행한 결과가 JSON 파일로 저장됨
+     - 규칙을 변경한 후 `preprocess_duckdb.py`를 다시 실행하면 JSON 파일이 새로 생성됨
 
 **결과물**:
 - `data_out/ald.duckdb`: 분석용 데이터베이스 파일

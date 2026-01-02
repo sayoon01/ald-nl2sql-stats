@@ -411,6 +411,14 @@ buf = plot_timeseries(df, title="압력 시계열", x_col="timestamp", y_col="va
 - 모든 컬럼을 자동 분류 (meta, pressure, temp, gas, apc, rf, valve, aux, other)
 - `config/catalog_physical.json` 저장
 
+**컬럼 분류 규칙 위치**:
+- **규칙 (로직)**: `src/preprocess_duckdb.py`의 `_generate_catalog()` 함수에 하드코딩됨
+  - 분류 로직을 수정하려면 이 함수의 코드를 변경해야 함
+  - 우선순위 기반 분류: meta → rf → apc → pressure → temp → valve → gas → aux → other
+- **결과 (데이터)**: `config/catalog_physical.json`에 저장됨
+  - 규칙을 실행한 결과가 JSON 파일로 저장됨
+  - 규칙을 변경한 후 `preprocess_duckdb.py`를 다시 실행하면 JSON 파일이 새로 생성됨
+
 **실행 방법**:
 ```bash
 python -m src.preprocess_duckdb
