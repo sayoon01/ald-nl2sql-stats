@@ -106,16 +106,54 @@ python -m src.preprocess_duckdb
 ```
 
 **이 명령이 하는 일**:
-1. `data/` 디렉토리에서 모든 CSV 파일 찾기 (`standard_trace_001.csv`, `002.csv` 등)
-2. 각 CSV 파일 읽기 (각 파일 = 1개 공정)
-3. 파일명에서 공정 ID(`trace_id`) 추출
+
+1. **CSV 파일 찾기 및 읽기**
+   - `data/` 디렉토리에서 모든 CSV 파일 찾기 (`standard_trace_001.csv`, `002.csv` 등)
+   - 총 74개 CSV 파일 발견 및 읽기 완료
+   - 각 CSV 파일 = 1개 공정 (1:1 관계)
+
+2. **공정 ID(`trace_id`) 추출**
+   - 파일명에서 공정 ID 자동 추출
    - 예: `standard_trace_001.csv` → `trace_id = "standard_trace_001"`
-4. 컬럼명 정규화 (공백, 특수문자 제거 → `PressAct` → `pressact`)
-5. 모든 데이터를 하나의 `traces` 테이블로 통합
+   - 총 74개 공정 확인
+
+3. **컬럼명 정규화 (slugify)**
+   - 공백, 특수문자 제거 및 소문자 변환
+   - 예: `PressAct` → `pressact`, `TempAct_U` → `tempact_u`
+   - 총 210개 컬럼 정규화 완료
+
+4. **`traces` 테이블 통합**
+   - 모든 CSV 데이터를 하나의 `traces` 테이블로 통합
    - 각 행은 `(trace_id, timestamp, ...)` 형태로 저장
-6. 중복 제거된 `traces_dedup` 뷰 생성
-7. `data_out/ald.duckdb` 파일 생성
-8. 컬럼 카탈로그 자동 생성 (`config/catalog_physical.json`)
+   - 총 2,438,733개 행 저장
+
+5. **중복 제거 뷰 생성**
+   - `traces_dedup` 뷰 생성 (중복 제거)
+   - 키: `(trace_id, timestamp)`
+   - 중복 제거: 9,133개 행 제거
+   - 최종 행 수: 2,429,600개
+
+6. **시간 축 표준화**
+   - `time_bucket_second`: 초 단위 버킷
+   - `epoch_ms`: 에포크 밀리초
+   - `traces_dedup` 뷰에 추가 (총 212개 컬럼)
+
+7. **DuckDB 파일 생성**
+   - `data_out/ald.duckdb` 파일 생성 (약 624MB)
+   - 모든 공정 데이터를 하나의 데이터베이스로 통합
+
+8. **컬럼 카탈로그 자동 생성**
+   - `config/catalog_physical.json` 생성 (약 4.2KB)
+   - 총 212개 컬럼을 9개 카테고리로 자동 분류:
+     - `meta`: 10개 (trace_id, timestamp, step_name 등)
+     - `pressure`: 10개 (pressact, vg11, vg12 등)
+     - `temp`: 51개 (tempact_u, tempact_l, heatertc 등)
+     - `gas`: 31개 (mfcmon_n2_1, mfcmon_nh3 등)
+     - `apc`: 4개 (apcvalvemon, apcvalveset 등)
+     - `rf`: 9개 (f_pwr, l_pos, p_pos 등)
+     - `valve`: 35개 (valveact_*, valveset_* 등)
+     - `aux`: 52개 (auxmon_* 등)
+     - `other`: 10개 (기타 컬럼)
 
 **결과물**:
 - `data_out/ald.duckdb`: 분석용 데이터베이스 파일
@@ -166,8 +204,8 @@ python src/app.py
 정규화된 텍스트: "pressact avg"
 ↓
 Parsed 객체:
-  - col: "pressact"
-  - agg: "avg"
+  - column: "pressact"  # 실제 필드명 (col은 하위 호환성 속성)
+  - metric: "avg"       # 실제 필드명 (agg는 하위 호환성 속성)
   - group_by: None
   - trace_id: None
   - step_name: None
@@ -506,18 +544,18 @@ from src.nl_parse_v2 import parse_question
 
 parsed = parse_question("pressact avg")
 # → Parsed(
-#     col="pressact",
-#     agg="avg",
+#     column="pressact",  # 실제 필드명
+#     metric="avg",       # 실제 필드명
 #     group_by=None,
-#     trace_id=None,
-#     step_name=None,
-#     limit=None
+#     filters={},
+#     top_n=None
 # )
+# 참고: parsed.col, parsed.agg는 하위 호환성을 위한 @property 속성
 ```
 
 파서는 다음을 추출합니다:
-- **컬럼**: `col` (pressact, vg11, tempact_u 등)
-- **집계 함수**: `agg` (avg, max, min, std 등)
+- **컬럼**: `column` (실제 필드명) 또는 `col` (하위 호환성 속성) - pressact, vg11, tempact_u 등
+- **집계 함수**: `metric` (실제 필드명) 또는 `agg` (하위 호환성 속성) - avg, max, min, std 등
 - **그룹핑**: `group_by` (trace_id, step_name, date 등)
 - **필터**: `trace_id`, `step_name`, `date_start`, `date_end`
 - **Top N**: `limit` (5, 10 등)

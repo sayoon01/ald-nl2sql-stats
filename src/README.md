@@ -129,25 +129,32 @@ UI 표시 또는 JSON 응답
 ```python
 @dataclass
 class Parsed:
-    agg: Agg                      # 집계 함수 (avg, max, min, std 등)
-    col: Optional[str]            # 컬럼명 (pressact, tempact_u 등)
-    trace_id: Optional[str]       # 공정 ID 필터
-    trace_ids: List[str]          # 여러 공정 ID (비교용)
-    step_name: Optional[str]      # 단계명 필터
-    step_names: List[str]         # 여러 단계명 (비교용)
-    group_by: Optional[str]        # 그룹핑 (trace_id, step_name 등)
-    limit: Optional[int]           # LIMIT N (Top-N)
-    order: Optional[Literal["desc", "asc"]]  # 정렬 방향
+    # 실제 필드 (표준 JSON 스키마)
+    metric: Agg = "avg"            # 집계 함수 (avg, max, min, std 등)
+    column: Optional[str] = None   # 컬럼명 (pressact, tempact_u 등)
+    group_by: GroupBy = None      # 그룹핑 (trace_id, step_name 등)
+    filters: dict = {}            # 필터 조건 (trace_id, step_name, date_start, date_end 등)
+    top_n: Optional[int] = None   # LIMIT N (Top-N)
     analysis_type: AnalysisType    # 분석 유형
-    is_overshoot: bool             # 공정 특화 지표 플래그
-    is_outlier: bool
-    is_dwell_time: bool
-    is_stable_avg: bool
-    is_trace_compare: bool
-    date_start: Optional[str]      # 시작 날짜
-    date_end: Optional[str]        # 종료 날짜
-    chart_type: Optional[str]      # 차트 타입 힌트
+    flags: dict = {}              # 특수 플래그 (is_overshoot, is_outlier 등)
+    
+    # 하위 호환성 속성 (@property로 제공)
+    @property
+    def agg(self) -> Agg:         # metric의 별칭 (하위 호환성)
+        return self.metric
+    
+    @property
+    def col(self) -> Optional[str]:  # column의 별칭 (하위 호환성)
+        return self.column
+    
+    @property
+    def trace_id(self) -> Optional[str]:  # filters.trace_id의 별칭
+        return self.filters.get("trace_id")
+    
+    # ... 기타 하위 호환성 속성들
 ```
+
+**참고**: 실제 필드명은 `metric`과 `column`입니다. `agg`와 `col`은 하위 호환성을 위한 @property 속성입니다.
 
 **사용 예시**:
 ```python
@@ -412,6 +419,11 @@ python -m src.preprocess_duckdb
 **결과물**:
 - `data_out/ald.duckdb`: DuckDB 데이터베이스 파일
 - `config/catalog_physical.json`: 컬럼 카탈로그
+
+**컬럼 수 정보**:
+- `traces` 테이블: 210개 컬럼 (원본 CSV 컬럼 + trace_id + timestamp)
+- `traces_dedup` 뷰: 212개 컬럼 (traces의 210개 + time_bucket_second + epoch_ms)
+- `catalog_physical.json`: 212개 컬럼을 9개 카테고리로 분류
 
 ---
 
