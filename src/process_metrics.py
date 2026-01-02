@@ -6,9 +6,9 @@ import duckdb  # type: ignore
 from pathlib import Path
 from src.nl_parse import Parsed
 
-# 프로젝트 루트 경로 설정
+# 프로젝트 루트 기준 경로 (참고용, 실제로는 app.py에서 사용)
 PROJECT_ROOT = Path(__file__).parent.parent
-DB = Path.home() / "ald_app" / "data_out" / "ald.duckdb"
+DB = PROJECT_ROOT / "data_out" / "ald.duckdb"
 
 # columns.yaml 로드 및 도메인키 → 실제 컬럼명 변환
 def _load_schema():
@@ -48,7 +48,7 @@ def build_stable_avg_sql(p: Parsed) -> Tuple[str, List]:
             {csv_col},
             ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY timestamp) as rn,
             COUNT(*) OVER (PARTITION BY step_name) as total
-        FROM traces
+        FROM traces_dedup
         {where_sql}
     ),
     stable AS (
@@ -78,17 +78,17 @@ def build_overshoot_sql(p: Parsed) -> Tuple[str, List]:
         step_name,
         MAX({pressact_col} - {pressset_col}) AS value,
         COUNT(*) AS n,
-        AVG({pressact_col} - {pressset_col}) AS avg_diff,
-        MIN({pressact_col} - {pressset_col}) AS min_diff,
-        MAX({pressact_col} - {pressset_col}) AS max_diff,
-        STDDEV({pressact_col} - {pressset_col}) AS std
-    FROM traces
+        AVG(pressact - pressset) AS avg_diff,
+        MIN(pressact - pressset) AS min_diff,
+        MAX(pressact - pressset) AS max_diff,
+        STDDEV(pressact - pressset) AS std
+    FROM traces_dedup
     {where_sql}
     GROUP BY step_name
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
@@ -106,7 +106,7 @@ def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
             MIN(timestamp) AS start_time,
             MAX(timestamp) AS end_time,
             EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) AS dwell_seconds
-        FROM traces
+        FROM traces_dedup
         {where_sql}
         GROUP BY trace_id, step_name
     )
@@ -119,8 +119,8 @@ def build_dwell_time_sql(p: Parsed) -> Tuple[str, List]:
     GROUP BY step_name
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
@@ -141,9 +141,9 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
     sql = f"""
     WITH global_stats AS (
         SELECT 
-            AVG({csv_col}) AS mean_val,
-            STDDEV({csv_col}) AS std_val
-        FROM traces
+            AVG({p.col}) AS mean_val,
+            STDDEV({p.col}) AS std_val
+        FROM traces_dedup
         {where_sql}
     ),
     z_scores AS (
@@ -155,7 +155,7 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
                 THEN ABS({csv_col} - (SELECT mean_val FROM global_stats)) / (SELECT std_val FROM global_stats)
                 ELSE 0
             END AS z_score
-        FROM traces
+        FROM traces_dedup
         {where_sql}
         WHERE {csv_col} IS NOT NULL
     )
@@ -166,11 +166,10 @@ def build_outlier_detection_sql(p: Parsed) -> Tuple[str, List]:
         SUM(CASE WHEN z_score > {z_threshold} THEN 1 ELSE 0 END) AS outlier_count
     FROM z_scores
     GROUP BY trace_id
-    HAVING SUM(CASE WHEN z_score > {z_threshold} THEN 1 ELSE 0 END) > 0
     ORDER BY value DESC
     """
-    if p.top_n:
-        sql += f" LIMIT {int(p.top_n)}"
+    if p.limit:
+        sql += f" LIMIT {int(p.limit)}"
     return sql, params
 
 def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
@@ -179,7 +178,7 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         raise ValueError("비교하려면 최소 2개의 trace_id가 필요합니다")
     
     trace1, trace2 = p.trace_ids[0], p.trace_ids[1]
-    domain_col = p.col or "pressact"
+    domain_col = getattr(p, 'col', None) or getattr(p, 'column', None) or "pressact"
     csv_col = _get_csv_column(domain_col)
     
     sql = f"""
@@ -187,7 +186,7 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         SELECT 
             step_name,
             AVG({csv_col}) AS avg_val
-        FROM traces
+        FROM traces_dedup
         WHERE trace_id = ?
         GROUP BY step_name
     ),
@@ -195,7 +194,7 @@ def build_trace_compare_sql(p: Parsed) -> Tuple[str, List]:
         SELECT 
             step_name,
             AVG({csv_col}) AS avg_val
-        FROM traces
+        FROM traces_dedup
         WHERE trace_id = ?
         GROUP BY step_name
     )

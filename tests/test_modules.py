@@ -19,7 +19,7 @@ from src.process_metrics import (
     build_trace_compare_sql,
 )
 from src.charts.renderer import render_chart
-from src.services.summary import make_summary
+from src.app import make_summary
 from domain.rules.normalization import normalize
 
 # 테스트용 DB 경로

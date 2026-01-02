@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ALD NL→SQL</title>
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -267,18 +268,33 @@
       </div>
     </form>
 
-    <div class="box">
-      <h3>예시 질문</h3>
+    {% if suggestions and suggestions|length > 0 %}
+    <div class="box" style="margin-top: 24px;">
+      <h3>질문 추천</h3>
       <div class="examples">
         <ul>
-          <li><code>공정별 pressact 평균 top5</code></li>
-          <li><code>스텝별 pressact 평균</code> <small style="color: #b0b0c0;">(n/std/min/max 포함)</small></li>
-          <li><code>pressact overshoot top10</code> <small style="color: #b0b0c0;">(오버슈트 큰 step)</small></li>
-          <li><code>pressact 이상치 top5</code> <small style="color: #b0b0c0;">(이상치 비율 큰 trace)</small></li>
-          <li><code>standard_trace_001과 standard_trace_002 pressact 비교</code> <small style="color: #b0b0c0;">(차이 큰 step top5)</small></li>
+          {% for suggestion in suggestions %}
+            <li>
+              {% if suggestion is string %}
+                {% set question_text = suggestion %}
+              {% else %}
+                {% set question_text = suggestion.question %}
+              {% endif %}
+              <a href="/view?q={{ question_text|urlencode }}" 
+                 style="display: inline-block; padding: 8px 16px; background: #2d3748; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; transition: all 0.2s; border: 1px solid #4a5568;"
+                 onmouseover="this.style.background='#4a5568'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(74, 85, 104, 0.4)';"
+                 onmouseout="this.style.background='#2d3748'; this.style.transform=''; this.style.boxShadow='';">
+                {{ question_text }}
+              </a>
+            </li>
+          {% endfor %}
         </ul>
       </div>
+      <div style="margin-top: 12px; font-size: 13px; color: #b0b0c0;">
+        위 추천 질문을 클릭하거나 직접 질문을 입력하세요
+      </div>
     </div>
+    {% endif %}
 
     {% if error %}
       <div class="box error-box">
@@ -338,10 +354,102 @@
                 {% endif %}
               </div>
             </div>
-            <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-            <div style="display:none; color: #ff6b6b; padding: 20px; text-align: center;">
-              차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #7c9ed9;">여기를 클릭</a>하여 직접 확인하세요.
-            </div>
+            {% if meta and meta.chart == 'bar' and rows_json %}
+              <!-- Plotly 차트 (집계 결과용) -->
+              <div id="plotly-chart" style="width:100%;height:420px;background:#0f1624;border-radius:8px;"></div>
+              <script type="application/json" id="chart-data">{{ rows_json|safe }}</script>
+              <script type="application/json" id="chart-meta">{{ meta|tojson|safe }}</script>
+              <script>
+                (function() {
+                  try {
+                    const dataElement = document.getElementById('chart-data');
+                    const metaElement = document.getElementById('chart-meta');
+                    if (!dataElement || !metaElement) return;
+                    
+                    const data = JSON.parse(dataElement.textContent);
+                    const meta = JSON.parse(metaElement.textContent);
+                    
+                    if (meta && meta.chart === 'bar' && data && Array.isArray(data) && data.length > 0) {
+                      const x = data.map(r => r[meta.x] || '');
+                      
+                      // 비교 쿼리 처리 (trace1_avg, trace2_avg가 있는 경우)
+                      if (meta.trace1_avg && meta.trace2_avg && data[0][meta.trace1_avg] !== undefined) {
+                        const trace1_vals = data.map(r => parseFloat(r[meta.trace1_avg]) || 0);
+                        const trace2_vals = data.map(r => parseFloat(r[meta.trace2_avg]) || 0);
+                        
+                        const trace1 = {
+                          type: 'bar',
+                          x: x,
+                          y: trace1_vals,
+                          name: 'Trace 1',
+                          marker: {color: '#4a5d7e'},
+                          hovertemplate: `${meta.x}: %{x}<br>Trace 1: %{y:,.2f} mTorr<extra></extra>`
+                        };
+                        
+                        const trace2 = {
+                          type: 'bar',
+                          x: x,
+                          y: trace2_vals,
+                          name: 'Trace 2',
+                          marker: {color: '#7c9ed9'},
+                          hovertemplate: `${meta.x}: %{x}<br>Trace 2: %{y:,.2f} mTorr<extra></extra>`
+                        };
+                        
+                        Plotly.newPlot('plotly-chart', [trace1, trace2], {
+                          barmode: 'group',
+                          margin: {t: 10, r: 10, b: 80, l: 60},
+                          xaxis: {automargin: true, color: '#e0e0e0', title: meta.x_label || meta.x},
+                          yaxis: {color: '#e0e0e0', title: '압력 (mTorr)'},
+                          paper_bgcolor: '#0f1624',
+                          plot_bgcolor: '#0f1624',
+                          font: {color: '#e0e0e0'},
+                          legend: {x: 0.7, y: 1, bgcolor: 'rgba(15,22,36,0.8)'}
+                        });
+                      } else {
+                        // 일반 바 차트
+                        const y = data.map(r => parseFloat(r[meta.y]) || 0);
+                        
+                        // hover 템플릿: 추가 정보(n, std 등) 표시
+                        let hovertemplate = `${meta.x}: %{x}<br>${meta.y_label || meta.y}: %{y:,.2f}`;
+                        if (data[0].n !== undefined) hovertemplate += '<br>n: %{customdata[0]}';
+                        if (data[0].std !== undefined) hovertemplate += '<br>std: %{customdata[1]:,.2f}';
+                        hovertemplate += '<extra></extra>';
+                        
+                        const trace = {
+                          type: 'bar',
+                          x: x,
+                          y: y,
+                          marker: {color: '#4a5d7e'},
+                          hovertemplate: hovertemplate,
+                          customdata: data.map(r => [r.n || '', r.std || ''])
+                        };
+                        
+                        Plotly.newPlot('plotly-chart', [trace], {
+                          margin: {t: 10, r: 10, b: 80, l: 60},
+                          xaxis: {automargin: true, color: '#e0e0e0', title: meta.x_label || meta.x},
+                          yaxis: {color: '#e0e0e0', title: meta.y_label || meta.y},
+                          paper_bgcolor: '#0f1624',
+                          plot_bgcolor: '#0f1624',
+                          font: {color: '#e0e0e0'}
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Plotly error:', e);
+                    const chartDiv = document.getElementById('plotly-chart');
+                    if (chartDiv) {
+                      chartDiv.innerHTML = '<div style="color: #ff6b6b; padding: 20px; text-align: center;">차트를 불러올 수 없습니다.</div>';
+                    }
+                  }
+                })();
+              </script>
+            {% else %}
+              <!-- Matplotlib 이미지 (시계열 등) -->
+              <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+              <div style="display:none; color: #ff6b6b; padding: 20px; text-align: center;">
+                차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #7c9ed9;">여기를 클릭</a>하여 직접 확인하세요.
+              </div>
+            {% endif %}
           </div>
         {% endif %}
 

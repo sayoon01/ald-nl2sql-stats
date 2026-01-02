@@ -6,7 +6,7 @@
 """
 import re
 from dataclasses import dataclass, field
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Tuple
 from datetime import datetime
 
 # 도메인 메타데이터 모듈
@@ -331,6 +331,9 @@ class Parsed:
     top_n: Optional[int] = None
     analysis_type: AnalysisType = "ranking"
     flags: dict = field(default_factory=dict)
+    # 하위 호환성: sql_builder.py에서 사용하는 필드
+    limit: Optional[int] = None  # top_n의 별칭 (하위 호환성)
+    order: Optional[Literal["desc", "asc"]] = None  # ORDER BY direction
     
     # 하위 호환성을 위한 속성 (deprecated, column/metric 사용 권장)
     @property
@@ -397,6 +400,11 @@ class Parsed:
     def is_stable_avg(self) -> bool:
         """하위 호환성: flags.is_stable_avg"""
         return self.flags.get("is_stable_avg", False)
+    
+    @property
+    def is_variability(self) -> bool:
+        """하위 호환성: flags.is_variability"""
+        return self.flags.get("is_variability", False)
     
     def to_dict(self) -> dict:
         """표준 JSON 형식으로 변환"""
@@ -519,11 +527,36 @@ def parse_question(q: str) -> Parsed:
     if "안정" in original or "stable" in original.lower():
         flags["is_stable_avg"] = True
     
+    # 변동성/이상치 큰 키워드 감지 및 처리
+    # 패턴: "변동", "불안정", "흔들", "표준편차", "std", "분산", "variance"
+    # 또는 "이상치.*큰", "큰.*이상치", "튀는", "변동.*큰", "큰.*변동" 같은 조합
+    variability_patterns = [
+        r"(변동|불안정|흔들|표준편차|std|분산|variance)",
+        r"(이상치.*큰|큰.*이상치|튀는)",
+        r"(변동.*큰|큰.*변동)",
+    ]
+    is_variability_keyword = any(re.search(pattern, original, re.IGNORECASE) for pattern in variability_patterns)
+    
+    # 변동성 키워드가 있고 group_by가 없으면 자동으로 step_name 설정 (스텝 키워드가 있을 때)
+    if is_variability_keyword and group_by is None:
+        if re.search(r"(스텝|단계|step)", original, re.IGNORECASE):
+            group_by = "step_name"
+    
+    # 변동성 키워드가 있고 group_by가 있으면 std + desc + 기본 top_n=10
+    order: Optional[Literal["desc", "asc"]] = None
+    if is_variability_keyword and group_by is not None:
+        metric = "std"  # agg를 std로 강제
+        flags["is_variability"] = True
+        order = "desc"  # 변동 큰 순서
+        # top_n이 없으면 기본값 10 설정
+        if top_n is None:
+            top_n = 10
+    
     # 분석 유형 결정 (우선순위: comparison > stability > ranking > group_profile)
     # 정책: 단일 집계도 ranking으로 통일 (항상 표 형태로 반환)
     if flags.get("is_trace_compare") or flags.get("is_step_compare"):
         analysis_type = "comparison"
-    elif flags.get("is_outlier") or flags.get("is_overshoot") or flags.get("is_stable_avg") or flags.get("is_dwell_time"):
+    elif flags.get("is_outlier") or flags.get("is_overshoot") or flags.get("is_stable_avg") or flags.get("is_dwell_time") or flags.get("is_variability"):
         analysis_type = "stability"
     elif group_by and top_n:
         # group_by + top_n이면 ranking (상위 N개 그룹)
@@ -568,7 +601,9 @@ def parse_question(q: str) -> Parsed:
         filters=filters,
         top_n=top_n,
         analysis_type=analysis_type,  # type: ignore
-        flags=flags
+        flags=flags,
+        limit=top_n,  # 하위 호환성: sql_builder.py에서 사용
+        order=order  # ORDER BY direction
     )
     
     return parsed

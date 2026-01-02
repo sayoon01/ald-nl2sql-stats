@@ -1,0 +1,323 @@
+pressure:
+  chamber:
+    act:
+      physical_columns:
+      - pressact
+      aliases:
+      - 챔버 압력
+      - 압력
+      - 진공
+      - 현재 압력
+      - 압력 실측
+      - pressact
+      - chamber pressure
+      - pressure
+      unit: Torr
+      scale: 1.0  # 단위 변환 스케일 (필요시 사용)
+      # normal_range: null  # 범위 정보 없음 (데이터 기반 자동 산정 필요 시 별도 처리)
+      range_source: "unknown"  # "spec", "data-driven", "unknown"
+      description: "챔버 압력"
+    set:
+      physical_columns:
+      - pressset
+      aliases:
+      - 설정 압력
+      - 목표 압력
+      - 압력 설정
+      - set pressure
+      - pressset
+      - pressure set
+      unit: mTorr
+  gauge:
+    vg11:
+      physical_columns:
+      - vg11
+      aliases:
+      - vg11
+      - vg 11
+      unit: Torr
+    vg12:
+      physical_columns:
+      - vg12
+      aliases:
+      - vg12
+      - vg 12
+      unit: Torr
+    vg13:
+      physical_columns:
+      - vg13
+      aliases:
+      - vg13
+      - vg 13
+      unit: Torr
+apc:
+  valve:
+    monitor:
+      physical_columns:
+      - apcvalvemon
+      aliases:
+      - apc 밸브 모니터
+      - apc 모니터
+      - apcvalvemon
+      - apc valve monitor
+      - apc monitor
+      unit: '%'
+    set:
+      physical_columns:
+      - apcvalveset
+      aliases:
+      - apc 밸브 설정
+      - apc 설정
+      - apcvalveset
+      - apc valve set
+      - apc set
+      unit: '%'
+gas:
+  dcs:
+    flow:
+      physical_columns:
+      - mfcmon_dcs
+      aliases:
+      - dcs
+      - 디클로로실란
+      - 실리콘 가스
+      - 주공정 가스
+      - mfcmon_dcs
+      - dcs flow
+      unit: SLM
+  nh3:
+    flow:
+      physical_columns:
+      - mfcmon_nh3
+      aliases:
+      - nh3
+      - 암모니아
+      - 암모니아 가스
+      - mfcmon_nh3
+      - nh3 flow
+      unit: SLM
+  n2:
+    '1':
+      flow:
+        physical_columns:
+        - mfcmon_n2_1
+        aliases:
+        - 질소 1
+        - n2-1
+        - 퍼지1
+        - n2 1번
+        - 질소가스 1
+        - mfcmon_n2_1
+        - n2-1 flow
+        - purge 1
+        unit: SLM
+    '2':
+      flow:
+        physical_columns:
+        - mfcmon_n2_2
+        aliases:
+        - 질소 2
+        - n2-2
+        - 퍼지2
+        - n2 2번
+        - 질소가스 2
+        - mfcmon_n2_2
+        - n2-2 flow
+        - purge 2
+        unit: SLM
+    '3':
+      flow:
+        physical_columns:
+        - mfcmon_n2_3
+        aliases:
+        - 질소 3
+        - n2-3
+        - 퍼지3
+        - n2 3번
+        - 질소가스 3
+        - mfcmon_n2_3
+        - n2-3 flow
+        - purge 3
+        unit: SLM
+    '4':
+      flow:
+        physical_columns:
+        - mfcmon_n2_4
+        aliases:
+        - 질소 4
+        - n2-4
+        - 퍼지4
+        - n2 4번
+        - 질소가스 4
+        - mfcmon_n2_4
+        - n2-4 flow
+        - purge 4
+        unit: SLM
+    r:
+      flow:
+        physical_columns:
+        - mfcmon_n2_r
+        aliases:
+        - n2-r
+        - n2 r
+        - 회전 질소
+        - rotation n2
+        - mfcmon_n2_r
+        - n2-r flow
+        unit: SLM
+  f2:
+    flow:
+      physical_columns:
+      - mfcmon_f2
+      aliases:
+      - f2
+      - 플루오린
+      - 플루오린 가스
+      - mfcmon_f2
+      - f2 flow
+      unit: SLM
+temp:
+  zone:
+    u:
+      act:
+        physical_columns:
+        - tempact_u
+        aliases:
+        - 상단 온도
+        - 온도 상단
+        - temp u
+        - tempact u
+        - tempact_u
+        - upper temperature
+        unit: °C
+      set:
+        physical_columns:
+        - tempset_u
+        aliases:
+        - 온도 설정 상단
+        - 상단 온도 설정
+        - tempset u
+        - tempset_u
+        - upper temperature set
+        unit: °C
+    cu:
+      act:
+        physical_columns:
+        - tempact_cu
+        aliases:
+        - 상중 온도
+        - 온도 상중
+        - temp cu
+        - tempact cu
+        - tempact_cu
+        - center upper temperature
+        unit: °C
+      set:
+        physical_columns:
+        - tempset_cu
+        aliases:
+        - 온도 설정 상중
+        - 상중 온도 설정
+        - tempset cu
+        - tempset_cu
+        - center upper temperature set
+        unit: °C
+    c:
+      act:
+        physical_columns:
+        - tempact_c
+        aliases:
+        - 중앙 온도
+        - 온도 중앙
+        - temp c
+        - tempact c
+        - tempact_c
+        - center temperature
+        unit: °C
+      set:
+        physical_columns:
+        - tempset_c
+        aliases:
+        - 온도 설정 중앙
+        - 중앙 온도 설정
+        - tempset c
+        - tempset_c
+        - center temperature set
+        unit: °C
+    cl:
+      act:
+        physical_columns:
+        - tempact_cl
+        aliases:
+        - 하중 온도
+        - 온도 하중
+        - temp cl
+        - tempact cl
+        - tempact_cl
+        - center lower temperature
+        unit: °C
+      set:
+        physical_columns:
+        - tempset_cl
+        aliases:
+        - 온도 설정 하중
+        - 하중 온도 설정
+        - tempset cl
+        - tempset_cl
+        - center lower temperature set
+        unit: °C
+    l:
+      act:
+        physical_columns:
+        - tempact_l
+        aliases:
+        - 하단 온도
+        - 온도 하단
+        - temp l
+        - tempact l
+        - tempact_l
+        - lower temperature
+        unit: °C
+      set:
+        physical_columns:
+        - tempset_l
+        aliases:
+        - 온도 설정 하단
+        - 하단 온도 설정
+        - tempset l
+        - tempset_l
+        - lower temperature set
+        unit: °C
+rf:
+  forward_power:
+    physical_columns:
+    - mfcmon_f_pwr
+    aliases:
+    - rf 전력
+    - forward power
+    - f.pwr
+    - rf 전력 입력
+    - mfcmon_f_pwr
+    - f_pwr
+    - forward power
+    unit: W
+  left_position:
+    physical_columns:
+    - mfcmon_l_pos
+    aliases:
+    - 커패시터 왼쪽
+    - l.pos
+    - left position
+    - mfcmon_l_pos
+    - l_pos
+    unit: '%'
+  right_position:
+    physical_columns:
+    - mfcmon_p_pos
+    aliases:
+    - 커패시터 오른쪽
+    - p.pos
+    - right position
+    - mfcmon_p_pos
+    - p_pos
+    unit: '%'

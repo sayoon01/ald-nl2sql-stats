@@ -12,6 +12,8 @@ def to_parsed_dict(parsed_obj) -> dict:
     d["col"] = getattr(parsed_obj, "col", d.get("column"))
     d["group_by"] = getattr(parsed_obj, "group_by", d.get("group_by"))
     d["top_n"] = getattr(parsed_obj, "top_n", d.get("top_n"))
+    d["limit"] = getattr(parsed_obj, "limit", d.get("limit", d.get("top_n")))  # limit도 포함
+    d["order"] = getattr(parsed_obj, "order", d.get("order"))  # order 포함
     d["analysis_type"] = getattr(parsed_obj, "analysis_type", d.get("analysis_type"))
     # 필터 속성들
     filters = d.get("filters", {})

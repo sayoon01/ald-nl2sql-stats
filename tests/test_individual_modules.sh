@@ -78,7 +78,7 @@ echo "-------------------"
 python3 -c "
 import pandas as pd
 from src.nl_parse_v2 import Parsed
-from src.services.summary import make_summary
+from src.app import make_summary
 p = Parsed(metric='avg', column='pressact', analysis_type='ranking')
 df = pd.DataFrame({'value': [10.5, 20.3, 15.7]})
 summary = make_summary(p, df)

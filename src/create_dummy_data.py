@@ -19,8 +19,8 @@ def create_dummy_data():
     # 데이터베이스 연결
     con = duckdb.connect(str(OUT_DB))
     
-    # 샘플 데이터 생성
-    trace_ids = ['standard_trace_001', 'standard_trace_002', 'standard_trace_003']
+    # 샘플 데이터 생성 (10개 이상의 trace 생성)
+    trace_ids = [f'standard_trace_{i:03d}' for i in range(1, 16)]  # 15개 trace 생성
     step_names = ['STANDBY', 'B.FILL', 'B.FILL4', 'B.FILL5', 'B.UP', 'B.DOWN', 'PROCESS', 'PURGE']
     
     rows = []

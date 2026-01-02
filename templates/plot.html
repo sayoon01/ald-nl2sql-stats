@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plot - ALD NL→SQL</title>
+  <title>ALD NL→SQL</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -15,7 +15,7 @@
       color: #e0e0e0;
     }
     .container {
-      max-width: 1400px;
+      max-width: 1200px;
       margin: 0 auto;
       background: #16213e;
       border-radius: 16px;
@@ -23,18 +23,23 @@
       padding: 32px;
       border: 1px solid #2a2a3e;
     }
-    h3 {
-      margin: 0 0 16px 0;
+    h2 {
+      margin: 0 0 24px 0;
       color: #fff;
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 700;
     }
-    .query-info {
-      margin-bottom: 24px;
-      padding: 16px;
+    .box { 
+      margin-top: 24px; 
+      padding: 20px; 
+      border: 1px solid #2a2a3e; 
+      border-radius: 12px;
       background: #0f1624;
-      border-radius: 8px;
-      border-left: 4px solid #4a5d7e;
+    }
+    .box h3 {
+      margin: 0 0 12px 0;
+      color: #fff;
+      font-size: 18px;
     }
     code { 
       background: #1a1a2e; 
@@ -46,50 +51,67 @@
       border: 1px solid #2a2a3e;
     }
     .plot-container {
-      margin-top: 24px;
-      text-align: center;
-      padding: 24px;
+      margin-top: 16px;
+      padding: 20px;
       background: #0f1624;
-      border-radius: 12px;
+      border-radius: 8px;
       border: 1px solid #2a2a3e;
+      text-align: center;
     }
-    img { 
-      max-width: 100%; 
+    .plot-container img {
+      max-width: 100%;
       height: auto;
       border-radius: 8px;
+      display: block;
+      margin: 16px auto 0 auto;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       background: white;
       padding: 10px;
     }
-    .back-link {
-      display: inline-block;
-      margin-top: 24px;
-      padding: 12px 24px;
+    button, a.button { 
+      padding: 14px 28px; 
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
       background: #2d3748;
       color: white;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 500;
       border: 1px solid #4a5568;
+      border-radius: 8px;
       transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
     }
-    .back-link:hover {
+    button:hover, a.button:hover {
       background: #4a5568;
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(74, 85, 104, 0.4);
+    }
+    button:active, a.button:active {
+      transform: translateY(0);
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h3>📈 차트 보기</h3>
-    <div class="query-info">
-      <strong>질문:</strong> <code>{{ q }}</code>
+    <h2>ALD 자연어 → SQL 기본통계</h2>
+    
+    <div class="box">
+      <h3>📈 차트 보기</h3>
+      <div style="margin-bottom: 16px; padding: 12px; background: #1a2332; border-radius: 8px; border-left: 4px solid #4a5d7e;">
+        <div style="font-size: 14px; color: #b0b0c0;">
+          <strong style="color: #fff;">질문:</strong> <code>{{ q }}</code>
+        </div>
+      </div>
+      <div class="plot-container">
+        <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <div style="display:none; color: #ff6b6b; padding: 20px; text-align: center;">
+          차트를 불러올 수 없습니다. <a href="/plot?q={{ q|urlencode }}" style="color: #7c9ed9;">여기를 클릭</a>하여 직접 확인하세요.
+        </div>
+      </div>
+      <div style="margin-top: 24px; text-align: center;">
+        <a href="/view?q={{ q|urlencode }}" class="button">← 결과로 돌아가기</a>
+      </div>
     </div>
-    <div class="plot-container">
-      <img src="/plot?q={{ q|urlencode }}" alt="plot" onerror="this.alt='이미지를 불러올 수 없습니다. 질문을 확인해주세요.';" />
-    </div>
-    <a href="/view?q={{ q|urlencode }}" class="back-link">← 결과로 돌아가기</a>
   </div>
 </body>
 </html>
